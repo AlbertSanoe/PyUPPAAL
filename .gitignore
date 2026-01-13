@@ -144,3 +144,5 @@ src/pyuppaal/simpleUML/*
 src/test_integration/uppaal
 
 bin/
+test_trial/
+plans/

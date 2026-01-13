@@ -358,32 +358,89 @@ class XmlReader:
     def get_notes(self):
         """
         By reading the 'system' part in the xml to init all time-automata instances.
+        Supports both single-line and multi-line system declarations.
         :return: a list fo 'Node'.
         """
         self.nodes = {}
         system_code = get_str_after(self.code, '<system>')
         system_code = get_str_before(system_code, '</system>')
         lines = system_code.split('\n')
+        
+        # 查找 system 声明（支持多行格式）
+        system_line = None
+        in_system_block = False
+        system_content = []
+        
         for line in lines:
-            if line[:7] == 'system ':
-                variables = get_str_before(line[7:], ';').split(',')
-                for var_name in variables:
-                    var_name = var_name.strip()
-                    assert (len(var_name) > 0)
+            stripped_line = line.strip()
+            
+            # 检查是否是 system 声明的开始
+            if stripped_line.startswith('system ') or stripped_line == 'system':
+                in_system_block = True
+                # 获取 system 关键字后面的内容
+                if stripped_line.startswith('system '):
+                    system_content.append(stripped_line[7:])
+                continue
+            
+            # 如果在 system 块中，收集内容直到遇到分号
+            if in_system_block:
+                if ';' in stripped_line:
+                    # 找到结束分号，获取分号前的内容
+                    before_semicolon = stripped_line.split(';')[0]
+                    system_content.append(before_semicolon)
+                    in_system_block = False
+                    break
+                else:
+                    system_content.append(stripped_line)
+        
+        # 合并所有 system 内容为一行
+        if system_content:
+            system_line = ' '.join(system_content)
+            # 清理：移除注释、多余空格
+            # 移除 // 开头的注释部分
+            cleaned_parts = []
+            for part in system_line.split(','):
+                part = part.strip()
+                # 跳过注释行
+                if part.startswith('//'):
+                    continue
+                # 移除行内注释
+                if '//' in part:
+                    part = part.split('//')[0].strip()
+                if part:
+                    cleaned_parts.append(part)
+            
+            # 解析变量列表
+            for var_name in cleaned_parts:
+                var_name = var_name.strip()
+                if len(var_name) == 0:
+                    continue
 
-                    if var_name in self.templates.keys():
-                        self.nodes[var_name] = self.templates[var_name].get_instance(var_name, '')
-                    else:
-                        l = ''
-                        for lines_i in lines:
-                            if lines_i[:len(var_name)] == var_name:
-                                l = get_str_after(lines_i, '=')
+                if var_name in self.templates.keys():
+                    self.nodes[var_name] = self.templates[var_name].get_instance(var_name, '')
+                else:
+                    l = ''
+                    for lines_i in lines:
+                        lines_i_stripped = lines_i.strip()
+                        # 匹配 "var_name = ..." 或 "var_name=..."
+                        if lines_i_stripped.startswith(var_name) and '=' in lines_i_stripped:
+                            eq_pos = lines_i_stripped.find('=')
+                            if lines_i_stripped[:eq_pos].strip() == var_name:
+                                l = lines_i_stripped[eq_pos + 1:].strip()
                                 break
-                        assert (l != '')
-                        temp_name = get_str_before(l, '(').strip()
-                        para_string = get_str_before(l, ')')
-                        para_string = get_str_after(para_string, '(')
-                        self.nodes[var_name] = self.templates[temp_name].get_instance(var_name, para_string)
+                    if l == '':
+                        # 如果找不到定义，跳过这个变量
+                        continue
+                    if '(' not in l:
+                        # 如果没有括号，跳过
+                        continue
+                    temp_name = get_str_before(l, '(').strip()
+                    if temp_name not in self.templates:
+                        # 如果模板不存在，跳过
+                        continue
+                    para_string = get_str_before(l, ')')
+                    para_string = get_str_after(para_string, '(')
+                    self.nodes[var_name] = self.templates[temp_name].get_instance(var_name, para_string)
         return self.nodes
 
 
@@ -392,9 +449,42 @@ def add_edge(a, b, label=''):
     return code
 
 
+def get_signal_base_name(signal: str) -> str:
+    """Extract the base name of a signal, removing array index parameters.
+    
+    Examples:
+        'request_trigger_sub[topic_id]' -> 'request_trigger_sub'
+        'event_wake_thread[executor_id]' -> 'event_wake_thread'
+        'simple_signal' -> 'simple_signal'
+    
+    Args:
+        signal: The signal name, possibly with array index.
+        
+    Returns:
+        The base name without array index.
+    """
+    if '[' in signal:
+        return signal.split('[')[0]
+    return signal
+
+
+def signals_match(sig_out: str, sig_in: str) -> bool:
+    """Check if two signals match based on their base names.
+    
+    Args:
+        sig_out: Output signal name.
+        sig_in: Input signal name.
+        
+    Returns:
+        True if the signals match (same base name).
+    """
+    return get_signal_base_name(sig_out) == get_signal_base_name(sig_in)
+
+
 def build_cg_code(nodes):
     """
     Given a list of 'Node', build the CG graph and print the markdown code.
+    Uses base signal names for matching to handle parameterized signals.
     """
     codes = ['graph TD']
     node_names = list(nodes.keys())
@@ -407,12 +497,24 @@ def build_cg_code(nodes):
                 continue
             node1 = nodes[node_names[i]]
             node2 = nodes[node_names[j]]
-            for signal in node1.sig_out:
-                if signal in node2.sig_in:
-                    codes.append(add_edge(node1.name, node2.name, signal))
-            for signal in node2.sig_out:
-                if signal in node1.sig_in:
-                    codes.append(add_edge(node2.name, node1.name, signal))
+            
+            # Check node1 -> node2 edges
+            for sig_out in node1.sig_out:
+                for sig_in in node2.sig_in:
+                    if signals_match(sig_out, sig_in):
+                        # Use base name for the edge label
+                        base_name = get_signal_base_name(sig_out)
+                        codes.append(add_edge(node1.name, node2.name, base_name))
+                        break  # Avoid duplicate edges for same base signal
+            
+            # Check node2 -> node1 edges
+            for sig_out in node2.sig_out:
+                for sig_in in node1.sig_in:
+                    if signals_match(sig_out, sig_in):
+                        # Use base name for the edge label
+                        base_name = get_signal_base_name(sig_out)
+                        codes.append(add_edge(node2.name, node1.name, base_name))
+                        break  # Avoid duplicate edges for same base signal
 
     # Merge all lines of code
     code = '\n'.join(codes)

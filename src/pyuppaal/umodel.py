@@ -1,5 +1,5 @@
-"""umodel
-"""
+"""umodel"""
+
 # support return typing UModel
 from __future__ import annotations
 import os
@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import List
 from itertools import product
 import uuid
+
 # from copy import deepcopy
 from tempfile import NamedTemporaryFile
 import xml.dom.minidom
@@ -23,8 +24,7 @@ from .mytree import MyTree
 
 
 class UModel:
-    """Load UPPAAL model for analysis, editing, verification and other operations. If you want to modify the model, you should `from pyuppaal.nta import Template, Location, Edge`.
-    """
+    """Load UPPAAL model for analysis, editing, verification and other operations. If you want to modify the model, you should `from pyuppaal.nta import Template, Location, Edge`."""
 
     def __init__(self, model_path: str = None):
         """_summary_
@@ -54,6 +54,7 @@ class UModel:
 
     # region 基础的 getter & setters
     # region ======== declaration ========
+
     @property
     def declaration(self) -> str:
         return self.__declaration
@@ -69,6 +70,7 @@ class UModel:
     # endregion
 
     # region ======== templates =======
+
     @property
     def templates(self) -> List[Template]:
         return self.__templates
@@ -206,7 +208,7 @@ class UModel:
             if start_index == -1:
                 break
             end_index = declarations.find(";", start_index, -1)
-            tmp_actions = declarations[start_index + 15: end_index].strip().split(",")
+            tmp_actions = declarations[start_index + 15 : end_index].strip().split(",")
             tmp_actions = [x.strip() for x in tmp_actions]
             broadcast_chan += tmp_actions
             start_index = end_index
@@ -333,11 +335,15 @@ system Process;
         """
 
         if indent != 0:
-            with NamedTemporaryFile(suffix="-unformatted.xml", mode="w", delete=False) as tmp_file:
-                self.ElementTree.write(tmp_file.name, encoding="utf-8", xml_declaration=True)
+            with NamedTemporaryFile(
+                suffix="-unformatted.xml", mode="w", delete=False
+            ) as tmp_file:
+                self.ElementTree.write(
+                    tmp_file.name, encoding="utf-8", xml_declaration=True
+                )
             dom = xml.dom.minidom.parse(tmp_file.name)
-            xml_str = dom.toprettyxml(indent=indent*" ")
-            with open(path, 'w', encoding='utf-8') as f:
+            xml_str = dom.toprettyxml(indent=indent * " ")
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(xml_str)
         else:
             self.ElementTree.write(path, encoding="utf-8", xml_declaration=True)
@@ -380,7 +386,13 @@ system Process;
     # endregion 基础的文件保存功能
 
     # region 验证相关
-    def verify(self, trace_path: str = None, verify_options: str = None, keep_tmp_file: bool = True, timeout: float = None) -> str:
+    def verify(
+        self,
+        trace_path: str = None,
+        verify_options: str = None,
+        keep_tmp_file: bool = True,
+        timeout: float = None,
+    ) -> str:
         """Verify and return the verify result. If `trace_path` is not given, it wll return the terminal result.
 
         Args:
@@ -392,7 +404,9 @@ system Process;
         Returns:
             str: terminal verify results for `self`.
         """
-        return Verifyta().verify(self.model_path, trace_path, verify_options, keep_tmp_file, timeout=timeout)
+        return Verifyta().verify(
+            self.model_path, trace_path, verify_options, keep_tmp_file, timeout=timeout
+        )
 
     def easy_verify(
         self, verify_options: str = "-t 1", keep_tmp_file=True, timeout: float = None
@@ -408,7 +422,7 @@ system Process;
             SimTrace | None: if exists a counter example, return a SimTrace, else return None.
         """
         if len(self.queries) != 1:
-            err_info = f'You can do easy_verify with only ONE query, current number of queries is: {len(self.queries)}, they are: {self.queries}.'
+            err_info = f"You can do easy_verify with only ONE query, current number of queries is: {len(self.queries)}, they are: {self.queries}."
             raise ValueError(err_info)
 
         # print(verify_options)
@@ -419,12 +433,18 @@ system Process;
         if Verifyta().get_uppaal_version() == 4:  # uppaal4.x
             xtr_trace_path = self.model_path.replace(".xml", ".xtr")
             verify_cmd_res = Verifyta().verify(
-                self.model_path, xtr_trace_path, verify_options=verify_options, timeout=timeout
+                self.model_path,
+                xtr_trace_path,
+                verify_options=verify_options,
+                timeout=timeout,
             )
 
             # print(verify_cmd_res)
             xtr_trace_path = xtr_trace_path.replace(".xtr", "-1.xtr")
-            if "Writing example trace to" in verify_cmd_res or "Writing counter example to" in verify_cmd_res:
+            if (
+                "Writing example trace to" in verify_cmd_res
+                or "Writing counter example to" in verify_cmd_res
+            ):
                 res = self.load_xtr_trace(xtr_trace_path)
                 if not keep_tmp_file:
                     os.remove(xtr_trace_path)
@@ -432,11 +452,17 @@ system Process;
         else:  # uppaal5.x
             xtr_trace_path = self.model_path.replace(".xml", "_xtr")
             verify_cmd_res = Verifyta().verify(
-                self.model_path, xtr_trace_path, verify_options=verify_options, timeout=timeout
+                self.model_path,
+                xtr_trace_path,
+                verify_options=verify_options,
+                timeout=timeout,
             )
 
             xtr_trace_path = xtr_trace_path.replace("_xtr", "_xtr-1")
-            if "Writing witness trace" in verify_cmd_res or "Writing counter example to" in verify_cmd_res:
+            if (
+                "Writing witness trace" in verify_cmd_res
+                or "Writing counter example to" in verify_cmd_res
+            ):
                 res = self.load_xtr_trace(xtr_trace_path)
                 if not keep_tmp_file:
                     os.remove(xtr_trace_path)
@@ -522,9 +548,9 @@ system Process;
                 f"observation should be List[str] or List[tuple[str,str,str]], but current is {type(observation)}."
             )
 
-    def __parse_observations(self,
-                             observation: List[str] | List[tuple[str, str, str]]
-                             ) -> List[tuple[str, str, str]]:
+    def __parse_observations(
+        self, observation: List[str] | List[tuple[str, str, str]]
+    ) -> List[tuple[str, str, str]]:
         """parse observations to List[tuple[str,str,str]]
         Args:
             observation (List[str] | List[tuple[str,str,str]]):
@@ -540,7 +566,9 @@ system Process;
         if isinstance(observation[0], str):
             return [(f"{action}?", "", "") for action in observation]
         elif isinstance(observation[0], tuple):
-            if isinstance(observation[0][1], int):  # if use int"time" not str"gclk >= time"
+            if isinstance(
+                observation[0][1], int
+            ):  # if use int"time" not str"gclk >= time"
                 processed_observations = []
                 for action, lb, ub in observation:
                     lb = f"gclk>={lb}"
@@ -611,9 +639,7 @@ system Process;
                 )
             )
 
-        sigma_o = list(
-            map(lambda x: x.replace("!", "").replace("?", ""), sigma_o)
-        )
+        sigma_o = list(map(lambda x: x.replace("!", "").replace("?", ""), sigma_o))
 
         if template_name in [template.name for template in self.templates]:
             raise ValueError(f"Template <{template_name}> already exists.")
@@ -783,7 +809,9 @@ system Process;
         """
         res = []
         new_model = self.copy_as(f"tmp_find_all_patterns_{uuid.uuid4()}.xml")
-        all_patterns_iter = new_model.find_all_patterns_iter(focused_actions, verify_options, keep_tmp_file)
+        all_patterns_iter = new_model.find_all_patterns_iter(
+            focused_actions, verify_options, keep_tmp_file
+        )
         for simtrace in all_patterns_iter:
             # print(simtrace.untime_pattern)
             res.append(simtrace)
@@ -879,9 +907,9 @@ system Process;
                 all_patterns=True,
             )
 
-            query_str = " && ".join(
-                [f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)]
-            )
+            query_str = " && ".join([
+                f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)
+            ])
             query_str = f"{default_query} && {query_str}"
 
             new_umodel.queries = query_str
@@ -914,7 +942,7 @@ system Process;
             keep_tmp_file (bool, optional): whether to keep the temp file such as `xtr` or in-process `xml`. Defaults to True.
 
         Returns:
-            (bool, UModel): 
+            (bool, UModel):
                 `bool` represents whether a `observation_suffix` sequence can happen after the `fault`.
                 `UModel` is the copied model.
 
@@ -973,18 +1001,20 @@ system Process;
         block_size = total_processes // 10
         blocks_printed = 0
 
-        if (visual):
-            print("Progress: [ ]", end='')  # 10 spaces inside brackets
-            print('\b' * 12, end='', flush=True)  # Move cursor back to start after '['
+        if visual:
+            print("Progress: [ ]", end="")  # 10 spaces inside brackets
+            print("\b" * 12, end="", flush=True)  # Move cursor back to start after '['
 
         for process_counter, suffix in enumerate(product(sigma_o, repeat=n), 1):
             suffix = list(suffix)
             # Update progress bar based on the number of iterations
             while (process_counter > (blocks_printed + 1) * block_size) and visual:
-                print('█', end='', flush=True)
+                print("█", end="", flush=True)
                 blocks_printed += 1
 
-            if self.__is_valid_suffix(sigma_o, sigma_un, fault, suffix, keep_tmp_file)[0]:
+            if self.__is_valid_suffix(sigma_o, sigma_un, fault, suffix, keep_tmp_file)[
+                0
+            ]:
                 verify_res, trace = self.fault_identification(
                     suffix, fault, sigma_o, sigma_un, keep_tmp_file
                 )
@@ -992,12 +1022,16 @@ system Process;
                     continue
                 else:
                     if visual:
-                        print(']' + ' ' * (10 - blocks_printed) + ' Early Return!')  # Finish the progress bar
+                        print(
+                            "]" + " " * (10 - blocks_printed) + " Early Return!"
+                        )  # Finish the progress bar
                     return False, trace
             else:
                 continue
         if visual:
-            print(']' + ' ' * (10 - blocks_printed) + ' Complete!')  # Finish the progress bar
+            print(
+                "]" + " " * (10 - blocks_printed) + " Complete!"
+            )  # Finish the progress bar
         return True, None
 
     def fault_diagnosability_optimized(
@@ -1037,10 +1071,14 @@ system Process;
                 # check if is valid observation sequence
                 suffix = list(node.observation_sequence)
                 node.has_checked = True
-                node.is_valid = self.__is_valid_suffix(sigma_o, sigma_un, fault, suffix, keep_tmp_file)[0]
+                node.is_valid = self.__is_valid_suffix(
+                    sigma_o, sigma_un, fault, suffix, keep_tmp_file
+                )[0]
                 # check if it can identify the fault
                 if node.is_valid and node.depth == n:
-                    can_detect, trace = self.fault_identification(suffix, fault, sigma_o, sigma_un, keep_tmp_file)
+                    can_detect, trace = self.fault_identification(
+                        suffix, fault, sigma_o, sigma_un, keep_tmp_file
+                    )
                     if not can_detect and node.depth == n:
                         return False, trace
 
@@ -1101,14 +1139,14 @@ system Process;
         control_length: int,
         keep_tmp_file=True,
     ) -> str:
-        """Tolerate the `identified_faults` such that the system can reach the `target_state`. 
+        """Tolerate the `identified_faults` such that the system can reach the `target_state`.
 
         Examples:
             >>> possible return results
-            "Fault can NOT be tolerated" 
+            "Fault can NOT be tolerated"
             "Fault can be tolerated, control sequence tail: ['a1', 'a2'], trace: ['a1', 'a2', 'a3', 'a4']"
             "Fault may be tolerated, control sequence tail: ['a1', 'a2'], trace: ['a1', 'a2', 'a3', 'a4']"
-            "Fault may be tolerated" means that the the provided control sequence is not confirmed to tolerate `identified_faults`, 
+            "Fault may be tolerated" means that the the provided control sequence is not confirmed to tolerate `identified_faults`,
             but there exists such a trace that lead to `target_state`.
 
         Args:
@@ -1216,7 +1254,9 @@ system Process;
         all_patterns = []
         monitor_id = 0
 
-        for new_pattern in self.find_all_patterns_iter(focused_actions=focused_actions, keep_tmp_file=keep_tmp_file):
+        for new_pattern in self.find_all_patterns_iter(
+            focused_actions=focused_actions, keep_tmp_file=keep_tmp_file
+        ):
             all_patterns.append(new_pattern)
 
             monitor_id += 1
@@ -1262,9 +1302,9 @@ system Process;
             # 构造验证语句
             # 构造monitor.pass
             # E<> Monitor0.pass & !Monitor1.pass
-            query_str = " && ".join(
-                [f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)]
-            )
+            query_str = " && ".join([
+                f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)
+            ])
             # E<> !Monitor0.pass & !Monitor1.pass
             query_str = f"{default_query} && {query_str}"
 

@@ -1,7 +1,8 @@
-""" NTA Module
-    This module contains classes and functions for working with UPPAAL NTA models.
-    
+"""NTA Module
+This module contains classes and functions for working with UPPAAL NTA models.
+
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 import xml.etree.ElementTree as ET
@@ -17,7 +18,7 @@ class Location:
 
     Examples:
         >>> # Creating a basic location with an ID and position.
-        >>> location = Location(location_id=1, location_pos=(100, 200)) 
+        >>> location = Location(location_id=1, location_pos=(100, 200))
         >>> # Creating a location with additional properties.
         >>> location = Location(
         >>>    location_id=2,
@@ -27,14 +28,25 @@ class Location:
         >>>    is_initial=True)
     """
 
-    def __init__(self, location_id: int, location_pos: Tuple(int, int),
-                 name: str = None, name_pos: Tuple(int, int) = None,
-                 invariant: str = None,  invariant_pos: Tuple(int, int) = None,
-                 rate_of_exponential: float = None, rate_of_exp_pos: Tuple(int, int) = None,
-                 is_initial: bool = False, is_urgent: bool = False, is_committed: bool = False,
-                 is_branchpoint: bool = False,
-                 comments: str = None, comments_pos: Tuple(int, int) = None,
-                 test_code_on_enter: str = None, test_code_on_exit: str = None) -> None:
+    def __init__(
+        self,
+        location_id: int,
+        location_pos: Tuple[int, int],
+        name: str = None,
+        name_pos: Tuple[int, int] = None,
+        invariant: str = None,
+        invariant_pos: Tuple[int, int] = None,
+        rate_of_exponential: float = None,
+        rate_of_exp_pos: Tuple[int, int] = None,
+        is_initial: bool = False,
+        is_urgent: bool = False,
+        is_committed: bool = False,
+        is_branchpoint: bool = False,
+        comments: str = None,
+        comments_pos: Tuple[int, int] = None,
+        test_code_on_enter: str = None,
+        test_code_on_exit: str = None,
+    ) -> None:
         """_summary_
 
         Args:
@@ -58,18 +70,18 @@ class Location:
         # 界面隐含属性
         # location_id自动更新，用户不要修改
         self.location_id: int = location_id
-        self.location_pos: Tuple(int, int) = location_pos
+        self.location_pos: Tuple[int, int] = location_pos
 
         # 界面文本属性
         # UI Tab: Location
         self.name: str | None = name
-        self.name_pos: Tuple(int, int) | None = name_pos
+        self.name_pos: Tuple[int, int] | None = name_pos
 
         self.invariant: str | None = invariant
-        self.invariant_pos: Tuple(int, int) | None = invariant_pos
+        self.invariant_pos: Tuple[int, int] | None = invariant_pos
 
         self.rate_of_exponential: float | None = rate_of_exponential
-        self.rate_of_exp_pos: Tuple(int, int) | None = rate_of_exp_pos
+        self.rate_of_exp_pos: Tuple[int, int] | None = rate_of_exp_pos
 
         self.is_initial: bool = is_initial
         self.is_urgent: bool = is_urgent
@@ -78,7 +90,7 @@ class Location:
 
         # UI Tab: Comments
         self.comments: str | None = comments
-        self.comments_pos: Tuple(int, int) | None = comments_pos
+        self.comments_pos: Tuple[int, int] | None = comments_pos
 
         # UI Tab: Test Code
         self.test_code_on_enter: str | None = test_code_on_enter
@@ -93,48 +105,61 @@ class Location:
         """
         # 如果是branch point，xml标签为branch point
         if self.is_branchpoint:
-            res = ET.Element('branchpoint',
-                             {'id': f'id{self.location_id}',
-                              'x': str(self.location_pos[0]),
-                              'y': str(self.location_pos[1]),
-                              })
+            res = ET.Element(
+                "branchpoint",
+                {
+                    "id": f"id{self.location_id}",
+                    "x": str(self.location_pos[0]),
+                    "y": str(self.location_pos[1]),
+                },
+            )
             res.text = " "
             return res
         else:
             # 如果是正常的location，xml标签为location
             x = self.location_pos[0]
             y = self.location_pos[1]
-            res = ET.Element('location',
-                             {'id': f'id{self.location_id}',
-                              'x': str(x),
-                              'y': str(y)})
+            res = ET.Element(
+                "location", {"id": f"id{self.location_id}", "x": str(x), "y": str(y)}
+            )
 
             # 添加名字
             if self.name is not None:
                 if self.name_pos is None:
-                    self.name_pos = (x-10, y-34)
-                elem = ET.Element('name', {'x': str(self.name_pos[0]),
-                                           'y': str(self.name_pos[1])})
+                    self.name_pos = (x - 10, y - 34)
+                elem = ET.Element(
+                    "name", {"x": str(self.name_pos[0]), "y": str(self.name_pos[1])}
+                )
                 elem.text = self.name
                 res.append(elem)
 
             # 添加 inv
             if self.invariant is not None:
                 if self.invariant_pos is None:
-                    self.invariant_pos = (x-10, y+17)
-                elem = ET.Element('label', {'kind': 'invariant',
-                                            'x': str(self.invariant_pos[0]),
-                                            'y': str(self.invariant_pos[1])})
+                    self.invariant_pos = (x - 10, y + 17)
+                elem = ET.Element(
+                    "label",
+                    {
+                        "kind": "invariant",
+                        "x": str(self.invariant_pos[0]),
+                        "y": str(self.invariant_pos[1]),
+                    },
+                )
                 elem.text = self.invariant
                 res.append(elem)
 
             # 添加 rate_of_exponential
             if self.rate_of_exponential is not None:
                 if self.rate_of_exp_pos is None:
-                    self.rate_of_exp_pos = (x-10, y+34)
-                elem = ET.Element('label', {'kind': 'exponentialrate',
-                                            'x': str(self.rate_of_exp_pos[0]),
-                                            'y': str(self.rate_of_exp_pos[1])})
+                    self.rate_of_exp_pos = (x - 10, y + 34)
+                elem = ET.Element(
+                    "label",
+                    {
+                        "kind": "exponentialrate",
+                        "x": str(self.rate_of_exp_pos[0]),
+                        "y": str(self.rate_of_exp_pos[1]),
+                    },
+                )
                 elem.text = str(self.rate_of_exponential)
                 res.append(elem)
 
@@ -142,33 +167,38 @@ class Location:
 
             # 添加 test_code_on_enter
             if self.test_code_on_enter is not None:
-                elem = ET.Element('label', {'kind': 'testcodeEnter'})
+                elem = ET.Element("label", {"kind": "testcodeEnter"})
                 elem.text = self.test_code_on_enter
                 res.append(elem)
 
             # 添加 test_code_on_exit
             if self.test_code_on_exit is not None:
-                elem = ET.Element('label', {'kind': 'testcodeExit'})
+                elem = ET.Element("label", {"kind": "testcodeExit"})
                 elem.text = self.test_code_on_exit
                 res.append(elem)
 
             # 添加 comments
             if self.comments is not None:
                 if self.comments_pos is None:
-                    self.comments_pos = (x-10, y+59)
-                elem = ET.Element('label', {'kind': 'comments',
-                                            'x': str(self.comments_pos[0]),
-                                            'y': str(self.comments_pos[1])})
+                    self.comments_pos = (x - 10, y + 59)
+                elem = ET.Element(
+                    "label",
+                    {
+                        "kind": "comments",
+                        "x": str(self.comments_pos[0]),
+                        "y": str(self.comments_pos[1]),
+                    },
+                )
                 elem.text = self.comments
                 res.append(elem)
 
             # 添加 is_committed
             if self.is_committed:
-                res.append(ET.Element('committed'))
+                res.append(ET.Element("committed"))
 
             # 添加 is_urgent
             if self.is_urgent:
-                res.append(ET.Element('urgent'))
+                res.append(ET.Element("urgent"))
             return res
 
     @property
@@ -183,10 +213,10 @@ class Location:
 
     @staticmethod
     def from_xml(location_xml: str | ET.Element) -> Location:
-        """ Parse `xml` element to a `Location` instance.
-        
+        """Parse `xml` element to a `Location` instance.
+
         Examples:
-            >>> # A committed location with many properties such as invariant, testcode, etc.         
+            >>> # A committed location with many properties such as invariant, testcode, etc.
                 <location id="id1" x="0" y="0">
                     <name x="-10" y="-34">location_name</name>
                     <label kind="invariant" x="-10" y="17">inv_inv</label>
@@ -198,7 +228,7 @@ class Location:
                 </location>
 
         Args:
-            location_xml (str | ET.Element): string that meets xml element format of location. 
+            location_xml (str | ET.Element): string that meets xml element format of location.
 
         Returns:
             Location: location instance
@@ -209,9 +239,11 @@ class Location:
             root = ET.fromstring(location_xml)
 
         if root.tag == "branchpoint":
-            return Location(location_id=int(root.get("id")[2:]),
-                            location_pos=(int(root.get("x")), int(root.get("y"))),
-                            is_branchpoint=True)
+            return Location(
+                location_id=int(root.get("id")[2:]),
+                location_pos=(int(root.get("x")), int(root.get("y"))),
+                is_branchpoint=True,
+            )
         elif root.tag == "location":
             name_elem = root.find("name")
             name: str = None
@@ -231,18 +263,21 @@ class Location:
             test_code_on_enter = None
             test_code_on_exit = None
             for label_elem in root.iter("label"):
-                if label_elem.get('kind') == "invariant":
+                if label_elem.get("kind") == "invariant":
                     invariant = label_elem.text
                     invariant_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-                elif label_elem.get('kind') == "exponentialrate":
+                elif label_elem.get("kind") == "exponentialrate":
                     rate_of_exponential = float(label_elem.text)
-                    rate_of_exp_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-                elif label_elem.get('kind') == "comments":
+                    rate_of_exp_pos = (
+                        int(label_elem.get("x")),
+                        int(label_elem.get("y")),
+                    )
+                elif label_elem.get("kind") == "comments":
                     comments = label_elem.text
                     comments_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-                elif label_elem.get('kind') == "testcodeEnter":
+                elif label_elem.get("kind") == "testcodeEnter":
                     test_code_on_enter = label_elem.text
-                elif label_elem.get('kind') == "testcodeExit":
+                elif label_elem.get("kind") == "testcodeExit":
                     test_code_on_exit = label_elem.text
                 else:
                     pass
@@ -254,26 +289,30 @@ class Location:
             is_urgent = root.find("urgent") is not None
             is_committed = root.find("committed") is not None
 
-            res = Location(location_id=int(root.get("id")[2:]),
-                           location_pos=(int(root.get("x")), int(root.get("y"))),
-                           name=name,
-                           name_pos=name_pos,
-                           invariant=invariant,
-                           invariant_pos=invariant_pos,
-                           rate_of_exponential=rate_of_exponential,
-                           rate_of_exp_pos=rate_of_exp_pos,
-                           # 在加载的时候，我们将从template加载is_initial, 这里默认设置成False
-                           is_initial=False,
-                           is_urgent=is_urgent,
-                           is_committed=is_committed,
-                           comments=comments,
-                           comments_pos=comments_pos,
-                           test_code_on_enter=test_code_on_enter,
-                           test_code_on_exit=test_code_on_exit)
+            res = Location(
+                location_id=int(root.get("id")[2:]),
+                location_pos=(int(root.get("x")), int(root.get("y"))),
+                name=name,
+                name_pos=name_pos,
+                invariant=invariant,
+                invariant_pos=invariant_pos,
+                rate_of_exponential=rate_of_exponential,
+                rate_of_exp_pos=rate_of_exp_pos,
+                # 在加载的时候，我们将从template加载is_initial, 这里默认设置成False
+                is_initial=False,
+                is_urgent=is_urgent,
+                is_committed=is_committed,
+                comments=comments,
+                comments_pos=comments_pos,
+                test_code_on_enter=test_code_on_enter,
+                test_code_on_exit=test_code_on_exit,
+            )
 
             return res
         else:
-            raise ValueError(f"can not parse: {root.tag}. Only support location, branchpoint.")
+            raise ValueError(
+                f"can not parse: {root.tag}. Only support location, branchpoint."
+            )
 
 
 @dataclass
@@ -286,7 +325,7 @@ class Edge:
     Examples:
         >>> # Creating an edge with basic properties.
         >>> edge = Edge(
-        >>>     source_location_id=1, 
+        >>>     source_location_id=1,
         >>>     target_location_id=2,
         >>>     source_location_pos=(100, 200),
         >>>     target_location_pos=(300, 400),
@@ -294,7 +333,7 @@ class Edge:
 
         >>> # Creating an edge with additional properties like synchronization and update.
         >>> edge = Edge(
-        >>>     source_location_id=1, 
+        >>>     source_location_id=1,
         >>>     target_location_id=2,
         >>>     source_location_pos=(100, 200),
         >>>     target_location_pos=(300, 400),
@@ -302,17 +341,27 @@ class Edge:
         >>>     update="x=0")
     """
 
-    def __init__(self, source_location_id: int, target_location_id: int,
-                 source_location_pos: Tuple(int, int),
-                 target_location_pos: Tuple(int, int),
-                 select: str = None, select_pos: Tuple(int, int) = None,
-                 sync: str = None, sync_pos: Tuple(int, int) = None,
-                 update: str = None, update_pos: Tuple(int, int) = None,
-                 guard: str = None, guard_pos: Tuple(int, int) = None,
-                 probability_weight: float = None, prob_weight_pos: Tuple(int, int) = None,
-                 comments: str = None, comments_pos: Tuple(int, int) = None,
-                 test_code: str = None,
-                 nails: List[Tuple(int, int)] = []) -> None:
+    def __init__(
+        self,
+        source_location_id: int,
+        target_location_id: int,
+        source_location_pos: Tuple[int, int],
+        target_location_pos: Tuple[int, int],
+        select: str = None,
+        select_pos: Tuple[int, int] = None,
+        sync: str = None,
+        sync_pos: Tuple[int, int] = None,
+        update: str = None,
+        update_pos: Tuple[int, int] = None,
+        guard: str = None,
+        guard_pos: Tuple[int, int] = None,
+        probability_weight: float = None,
+        prob_weight_pos: Tuple[int, int] = None,
+        comments: str = None,
+        comments_pos: Tuple[int, int] = None,
+        test_code: str = None,
+        nails: List[Tuple[int, int]] = [],
+    ) -> None:
         """
 
         Args:
@@ -341,38 +390,38 @@ class Edge:
         """
         # 界面隐含属性
         self.source_location_id: int = source_location_id
-        self.source_location_pos: Tuple(int, int) = source_location_pos
+        self.source_location_pos: Tuple[int, int] = source_location_pos
 
         self.target_location_id: int = target_location_id
-        self.target_location_pos: Tuple(int, int) = target_location_pos
+        self.target_location_pos: Tuple[int, int] = target_location_pos
 
         # 界面文本属性
         # UI Tab: Edge
         self.select: str | None = select
-        self.select_pos: Tuple(int, int) | None = select_pos
+        self.select_pos: Tuple[int, int] | None = select_pos
         # 普通 edge 包含 guard，不包含 probability_weight
         self.guard: str | None = guard
-        self.guard_pos: Tuple(int, int) | None = guard_pos
+        self.guard_pos: Tuple[int, int] | None = guard_pos
 
         self.sync: str | None = sync
-        self.sync_pos: Tuple(int, int) | None = sync_pos
+        self.sync_pos: Tuple[int, int] | None = sync_pos
 
         self.update: str | None = update
-        self.update_pos: Tuple(int, int) | None = update_pos
+        self.update_pos: Tuple[int, int] | None = update_pos
 
         # 由 branch_point 出来的边带有 probability_weight, 没有guard
         self.probability_weight: float | None = probability_weight
-        self.prob_weight_pos: Tuple(int, int) | None = prob_weight_pos
+        self.prob_weight_pos: Tuple[int, int] | None = prob_weight_pos
 
         # UI Tab: Comments
         self.comments: str | None = comments
-        self.comments_pos: Tuple(int, int) | None = comments_pos
+        self.comments_pos: Tuple[int, int] | None = comments_pos
 
         # UI Tab: Test Code
         self.test_code: str | None = test_code
 
         # 转折点 List[(x, y)]
-        self.nails: List[Tuple(int, int)] = nails
+        self.nails: List[Tuple[int, int]] = nails
 
         # 不能同时为normal edge和probability edge
         if not (self.probability_weight is None or self.guard is None):
@@ -392,93 +441,124 @@ class Edge:
         x = (self.source_location_pos[0] + self.target_location_pos[0]) // 2
         y = (self.source_location_pos[1] + self.target_location_pos[1]) // 2
 
-        transition = ET.Element('transition')
+        transition = ET.Element("transition")
         # 构建并添加source
-        source = ET.Element('source', {'ref': f'id{self.source_location_id}'})
+        source = ET.Element("source", {"ref": f"id{self.source_location_id}"})
         transition.append(source)
         # 构建并添加target
-        target = ET.Element('target', {'ref': f'id{self.target_location_id}'})
+        target = ET.Element("target", {"ref": f"id{self.target_location_id}"})
         transition.append(target)
 
         # 构建并添加select
         if self.select is not None:
             if self.select_pos is None:
-                self.select_pos = (x+18, y-51)
+                self.select_pos = (x + 18, y - 51)
 
-            label_select = ET.Element('label', {'kind': 'select',
-                                                'x': str(self.select_pos[0]),
-                                                'y': str(self.select_pos[1])})
+            label_select = ET.Element(
+                "label",
+                {
+                    "kind": "select",
+                    "x": str(self.select_pos[0]),
+                    "y": str(self.select_pos[1]),
+                },
+            )
             label_select.text = self.select
             transition.append(label_select)
 
         # 构建并添加guard
         if self.guard is not None:
             if self.guard_pos is None:
-                self.guard_pos = (x+18, y-34)
-            label_guard = ET.Element('label', {'kind': 'guard',
-                                               'x': str(self.guard_pos[0]),
-                                               'y': str(self.guard_pos[1])})
+                self.guard_pos = (x + 18, y - 34)
+            label_guard = ET.Element(
+                "label",
+                {
+                    "kind": "guard",
+                    "x": str(self.guard_pos[0]),
+                    "y": str(self.guard_pos[1]),
+                },
+            )
             label_guard.text = self.guard
             transition.append(label_guard)
 
         # 构建并添加synchronisation
         if self.sync is not None:
             if self.sync_pos is None:
-                self.sync_pos = (x+18, y-17)
-            label_sync = ET.Element('label', {'kind': 'synchronisation',
-                                              'x': str(self.sync_pos[0]),
-                                              'y': str(self.sync_pos[1])})
+                self.sync_pos = (x + 18, y - 17)
+            label_sync = ET.Element(
+                "label",
+                {
+                    "kind": "synchronisation",
+                    "x": str(self.sync_pos[0]),
+                    "y": str(self.sync_pos[1]),
+                },
+            )
             label_sync.text = self.sync
             transition.append(label_sync)
 
-         # 构建并添加assignment: update
+        # 构建并添加assignment: update
         if self.update is not None:
             if self.update_pos is None:
-                self.update_pos = (x+18, y)
-            label_update = ET.Element('label', {'kind': 'assignment',
-                                                'x': str(self.update_pos[0]),
-                                                'y': str(self.update_pos[1])})
+                self.update_pos = (x + 18, y)
+            label_update = ET.Element(
+                "label",
+                {
+                    "kind": "assignment",
+                    "x": str(self.update_pos[0]),
+                    "y": str(self.update_pos[1]),
+                },
+            )
             label_update.text = self.update
             transition.append(label_update)
 
         # 构建并添加 testcode
         if self.test_code is not None:
-            elem = ET.Element('label', {'kind': 'testcode'})
+            elem = ET.Element("label", {"kind": "testcode"})
             elem.text = self.test_code
             transition.append(elem)
 
         # 构建并添加 comments
         if self.comments is not None:
             if self.comments_pos is None:
-                self.comments_pos = (x+18, y+25)
-            elem = ET.Element('label', {'kind': 'comments',
-                                        'x': str(self.comments_pos[0]),
-                                        'y': str(self.comments_pos[1])})
+                self.comments_pos = (x + 18, y + 25)
+            elem = ET.Element(
+                "label",
+                {
+                    "kind": "comments",
+                    "x": str(self.comments_pos[0]),
+                    "y": str(self.comments_pos[1]),
+                },
+            )
             elem.text = self.comments
             transition.append(elem)
 
         # 构建并添加probability
         if self.probability_weight is not None:
             if self.prob_weight_pos is None:
-                self.prob_weight_pos = (x+18, y+44)
-            elem = ET.Element('label', {'kind': 'probability',
-                                        'x': str(self.prob_weight_pos[0]),
-                                        'y': str(self.prob_weight_pos[1])})
+                self.prob_weight_pos = (x + 18, y + 44)
+            elem = ET.Element(
+                "label",
+                {
+                    "kind": "probability",
+                    "x": str(self.prob_weight_pos[0]),
+                    "y": str(self.prob_weight_pos[1]),
+                },
+            )
             elem.text = str(self.probability_weight)
             transition.append(elem)
 
         # 构建并添加nail (弯曲结点)
         if self.nails is not None:
             for nail in self.nails:
-                nail_element = ET.Element('nail', {'x': str(nail[0]),
-                                                   'y': str(nail[1])})
+                nail_element = ET.Element(
+                    "nail", {"x": str(nail[0]), "y": str(nail[1])}
+                )
                 transition.append(nail_element)
         return transition
 
     @property
     def xml(self) -> str:
         """__summary__
-        
+
         Examples:
             >>> # example of transition (in gui named Edge) xml
                 <transition>
@@ -495,16 +575,16 @@ class Edge:
                     <nail x="68" y="0"/>
                     <nail x="102" y="42"/>
                 </transition>
-                
+
         """
         element = self.Element
         return ET.tostring(element, encoding="utf-8").decode("utf-8")
 
     @staticmethod
     def from_xml(edge_xml: str | ET.Element) -> Edge:
-        """ __summary__
-        
-        Examples: 
+        """__summary__
+
+        Examples:
             >>> # normal transition
                 <transition>
                     <source ref="id1"/>
@@ -520,8 +600,8 @@ class Edge:
                 </transition>
 
         Args:
-            et (str | ET.Element): string that meets xml element format of branch point. 
-            
+            et (str | ET.Element): string that meets xml element format of branch point.
+
         Returns:
             Edge: edge instance
         """
@@ -544,24 +624,24 @@ class Edge:
         comments_pos = None
         test_code = None
         for label_elem in root.iter("label"):
-            if label_elem.get('kind') == "select":
+            if label_elem.get("kind") == "select":
                 select = label_elem.text
                 select_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-            elif label_elem.get('kind') == "guard":
+            elif label_elem.get("kind") == "guard":
                 guard = label_elem.text
                 guard_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-            elif label_elem.get('kind') == "synchronisation":
+            elif label_elem.get("kind") == "synchronisation":
                 sync = label_elem.text
                 sync_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-            elif label_elem.get('kind') == "assignment":
+            elif label_elem.get("kind") == "assignment":
                 update = label_elem.text
                 update_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-            elif label_elem.get('kind') == "probability":
+            elif label_elem.get("kind") == "probability":
                 probability_weight = label_elem.text
                 prob_weight_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
-            elif label_elem.get('kind') == "testcode":
+            elif label_elem.get("kind") == "testcode":
                 test_code = label_elem.text
-            elif label_elem.get('kind') == "comments":
+            elif label_elem.get("kind") == "comments":
                 comments = label_elem.text
                 comments_pos = (int(label_elem.get("x")), int(label_elem.get("y")))
             else:
@@ -573,36 +653,48 @@ class Edge:
             y = int(nail_elem.get("y"))
             nails.append((x, y))
 
-        return Edge(source_location_id=int(root.find("source").get("ref")[2:]),
-                    target_location_id=int(root.find("target").get("ref")[2:]),
-                    source_location_pos=(-1, -1),
-                    target_location_pos=(-1, -1),
-                    select=select, select_pos=select_pos,
-                    guard=guard, guard_pos=guard_pos,
-                    sync=sync, sync_pos=sync_pos,
-                    update=update, update_pos=update_pos,
-                    probability_weight=probability_weight, prob_weight_pos=prob_weight_pos,
-                    comments=comments, comments_pos=comments_pos,
-                    test_code=test_code,
-                    nails=nails)
+        return Edge(
+            source_location_id=int(root.find("source").get("ref")[2:]),
+            target_location_id=int(root.find("target").get("ref")[2:]),
+            source_location_pos=(-1, -1),
+            target_location_pos=(-1, -1),
+            select=select,
+            select_pos=select_pos,
+            guard=guard,
+            guard_pos=guard_pos,
+            sync=sync,
+            sync_pos=sync_pos,
+            update=update,
+            update_pos=update_pos,
+            probability_weight=probability_weight,
+            prob_weight_pos=prob_weight_pos,
+            comments=comments,
+            comments_pos=comments_pos,
+            test_code=test_code,
+            nails=nails,
+        )
 
 
 @dataclass
 class Template:
-    """ Represents a template in a UPPAAL model, defining a set of locations (states), edges (transitions), and other properties.
+    """Represents a template in a UPPAAL model, defining a set of locations (states), edges (transitions), and other properties.
 
     A template in UPPAAL is a reusable structure that can be instantiated multiple times within a model. It contains locations, edges, declarations, and other components necessary for modeling a component or a system.
 
     """
+
     # 别忘记新发现的 branch point
 
-    def __init__(self, name: str,
-                 locations: List[Location],
-                 init_ref: int,
-                 edges: List[Edge] = None,
-                 params: str = None,
-                 declaration: str = None) -> None:
-        """ Template
+    def __init__(
+        self,
+        name: str,
+        locations: List[Location],
+        init_ref: int,
+        edges: List[Edge] = None,
+        params: str = None,
+        declaration: str = None,
+    ) -> None:
+        """Template
 
         Args:
             name (str): The name of the template.
@@ -665,19 +757,19 @@ class Template:
         Returns:
             ET.Element: xml.etree.ElementTree.Element
         """
-        res = ET.Element('template')
+        res = ET.Element("template")
 
-        temp_name_elem = ET.Element('name')
+        temp_name_elem = ET.Element("name")
         temp_name_elem.text = self.name
         res.append(temp_name_elem)
 
         if self.params is not None:
-            elem = ET.Element('parameter')
+            elem = ET.Element("parameter")
             elem.text = self.params
             res.append(elem)
 
         if self.declaration is not None:
-            elem = ET.Element('declaration')
+            elem = ET.Element("declaration")
             elem.text = self.declaration
             res.append(elem)
 
@@ -691,7 +783,7 @@ class Template:
 
         # init_ref 在 .xml 文件中出现的位置,
         # 是在 location 和 branch_point全部出现完之后
-        init_id_elem = ET.Element('init', {'ref': f'id{self.init_ref}'})
+        init_id_elem = ET.Element("init", {"ref": f"id{self.init_ref}"})
         res.append(init_id_elem)
 
         if self.edges is not None:
@@ -769,61 +861,6 @@ class Template:
         for e_elem in root.iter("transition"):
             edges.append(Edge.from_xml(e_elem))
 
-        temp_res = Template(name, locations, init_ref, edges,
-                            params, declaration)
+        temp_res = Template(name, locations, init_ref, edges, params, declaration)
 
         return temp_res
-
-    # @staticmethod
-    # def input_template(name: str, signals: List[Tuple[str, str, str]], init_id: int) -> Template:
-    #     """_summary_
-
-    #     >>> monitor = Template.construct_input_template(xxx)
-    #     >>> umodel = UModel(xxx)
-    #     >>> umodel.add_template(monitor: Tempalte)
-    #     >>> umodel.add_template_to_system(str: template_name)
-
-    #     Args:
-    #         name (str): The name of the input template.
-    #         signals (List[Tuple[str, str, str]]): A list of tuples where each tuple represents an input signal.
-    #             Each tuple consists of (action_name, guard_condition, invariant_condition).
-    #             - action_name (str): The name of the action or signal.
-    #             - guard_condition (str): The guard condition associated with the action.
-    #             - invariant_condition (str): The invariant condition associated with the location.
-    #         init_id (int): The initial ID to use for the locations in this template.
-
-    #     Returns:
-    #         Template: A UPPAAL template object representing the input signals with their respective guards and invariants.
-
-    #     Example Usage:
-    #         >>> input_signals = [('signal1', 'x >= 10', 'x <= 20'), ('signal2', 'y >= 5', 'y <= 10')]
-    #         >>> input_template = Monitors.input_template('InputSignals', input_signals, 1)
-    #         >>> print(input_template.name)
-    #         'InputSignals'
-    #     """
-
-    #     # 创建locations
-    #     locations = []
-    #     edges = []
-    #     for i, signal_i in enumerate(signals):
-    #         # [signal, guard, inv, name]
-    #         location_pos = (300 * i, 200)
-    #         location = Location(location_id=init_id + i, location_pos=location_pos, invariant=signal_i[2])
-    #         locations.append(location)
-    #         # [signal, guard, inv]
-    #         edge = Edge(source_location_id=init_id + i,
-    #                     target_location_id=init_id + i + 1,
-    #                     source_location_pos=location_pos,
-    #                     target_location_pos=(location_pos[0]+300, 200),
-    #                     guard=signal_i[1], sync=signal_i[0]+'!')
-    #         edges.append(edge)
-    #     # 需要多一个尾巴location
-    #     location = Location(location_id=init_id + len(signals), location_pos=(300 * len(signals), 200), name='pass')
-    #     locations.append(location)
-
-    #     # 获得clock name并创建declaration
-    #     clk_name = signals[0][1].split('>')[0]
-    #     declaration = f'clock {clk_name};'
-    #     input_temp = Template(name=name, locations=locations,
-    #                           init_ref=init_id, edges=edges, declaration=declaration)
-    #     return input_temp
