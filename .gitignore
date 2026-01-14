@@ -144,5 +144,9 @@ src/pyuppaal/simpleUML/*
 src/test_integration/uppaal
 
 bin/
-test_trial/
 plans/
+
+# test_trial - keep folder but ignore output and xml files
+src/test_trial/output/
+src/test_trial/output_py_export/
+src/test_trial/**/*.xml
