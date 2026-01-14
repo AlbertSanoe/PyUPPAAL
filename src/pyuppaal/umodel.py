@@ -52,9 +52,6 @@ class UModel:
         # 解构xml
         self.__build()
 
-    # region 基础的 getter & setters
-    # region ======== declaration ========
-
     @property
     def declaration(self) -> str:
         return self.__declaration
@@ -382,6 +379,47 @@ system Process;
 
         self.ElementTree.write(new_path, encoding="utf-8", xml_declaration=True)
         return UModel(new_path)
+
+    def py_fmt_export(self, output_dir: str, mode: str = "human") -> None:
+        """Export model to Python format folder structure.
+
+        Args:
+            output_dir: Output directory path.
+            mode: Export mode - "human" for Python code, "machine" for TOML data.
+
+        Generated directory structure (human mode):
+            output_dir/
+            ├── __init__.py
+            ├── decl/
+            │   ├── __init__.py
+            │   └── decl.txt
+            ├── sys_decl/
+            │   ├── __init__.py
+            │   └── sys_decl.txt
+            ├── queries/
+            │   ├── __init__.py
+            │   └── queries.py
+            ├── {TemplateName}/
+            │   ├── __init__.py
+            │   ├── decl_{TemplateName}.txt
+            │   └── template_{TemplateName}.py
+            └── registry.py
+
+        Generated directory structure (machine mode):
+            output_dir/
+            ├── manifest.toml
+            ├── decl/
+            │   └── decl.toml
+            ├── sys_decl/
+            │   └── sys_decl.toml
+            ├── queries/
+            │   └── queries.toml
+            └── {TemplateName}/
+                └── {TemplateName}.toml
+        """
+        from .py_exporter import PyExporter
+
+        PyExporter.export(self, output_dir, mode=mode)
 
     # endregion 基础的文件保存功能
 
