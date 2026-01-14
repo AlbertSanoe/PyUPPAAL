@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import xml.etree.ElementTree as ET
 from typing import List
+from contextlib import contextmanager
 from itertools import product
 import uuid
 
@@ -37,6 +38,7 @@ class UModel:
         self.__system: str = "system cannot be None"
         self.__queries: List[str] | None = None
         self.__model_path: str = model_path
+        self._autosave: bool = True  # Control automatic saving on property changes
 
         if model_path is None:
             print(
@@ -52,6 +54,57 @@ class UModel:
         # 解构xml
         self.__build()
 
+    @classmethod
+    def from_components(
+        cls,
+        declaration: str,
+        templates: List[Template],
+        system: str,
+        queries: List[str] = None,
+        model_path: str = None
+    ) -> UModel:
+        """Create a UModel from components without requiring an XML file.
+
+        This method allows constructing a UModel directly from its components,
+        bypassing the need for an existing XML file. Useful for importing from
+        pyfmt directories or programmatic model construction.
+
+        Args:
+            declaration: Global declarations string.
+            templates: List of Template objects.
+            system: System declaration string.
+            queries: List of query strings. Defaults to None.
+            model_path: Optional path for the model. Defaults to None.
+
+        Returns:
+            UModel: A new UModel instance with autosave disabled.
+        """
+        u = object.__new__(cls)
+        u._UModel__declaration = declaration
+        u._UModel__templates = templates
+        u._UModel__system = system
+        u._UModel__queries = queries
+        u._UModel__model_path = model_path
+        u._autosave = False  # Disable autosave for in-memory models
+        return u
+
+    @contextmanager
+    def no_autosave(self):
+        """Context manager to temporarily disable autosave.
+
+        Usage:
+            with umodel.no_autosave():
+                umodel.declaration = "..."
+                umodel.system = "..."
+            # autosave is restored after the block
+        """
+        old_value = self._autosave
+        self._autosave = False
+        try:
+            yield
+        finally:
+            self._autosave = old_value
+
     @property
     def declaration(self) -> str:
         return self.__declaration
@@ -62,7 +115,8 @@ class UModel:
             err_info = f"declaration requires string, current is: {type(value)}."
             raise ValueError(err_info)
         self.__declaration = value
-        self.save()
+        if self._autosave:
+            self.save()
 
     # endregion
 
@@ -78,7 +132,8 @@ class UModel:
         #     err_info = f"declaration requires List[Template], current is: {type(value)}."
         #     raise ValueError(err_info)
         self.__templates = value
-        self.save()
+        if self._autosave:
+            self.save()
 
     # endregion
 
@@ -93,7 +148,8 @@ class UModel:
             err_info = f"system requires string, current is: {type(value)}."
             raise ValueError(err_info)
         self.__system = value
-        self.save()
+        if self._autosave:
+            self.save()
 
     # endregion
 
@@ -116,7 +172,8 @@ class UModel:
         if isinstance(value, str):
             value = [value]
         self.__queries = value
-        self.save()
+        if self._autosave:
+            self.save()
 
     # endregion
 
@@ -364,7 +421,15 @@ system Process;
 
         Returns:
             UModel: self.
+
+        Raises:
+            ValueError: If model_path is None.
         """
+        if self.model_path is None:
+            raise ValueError(
+                "Cannot save: model_path is None. "
+                "Use save_as(path) to specify a file path."
+            )
         return self.save_as(self.model_path)
 
     def copy_as(self, new_path: str) -> UModel:
@@ -385,7 +450,7 @@ system Process;
 
         Args:
             output_dir: Output directory path.
-            mode: Export mode - "human" for Python code, "machine" for TOML data.
+            mode: Export mode - "human" for Python code, "machine" for structured data.
 
         Generated directory structure (human mode):
             output_dir/
@@ -409,17 +474,52 @@ system Process;
             output_dir/
             ├── manifest.toml
             ├── decl/
-            │   └── decl.toml
+            │   └── decl.json
             ├── sys_decl/
-            │   └── sys_decl.toml
+            │   └── sys_decl.json
             ├── queries/
-            │   └── queries.toml
+            │   └── queries.json
             └── {TemplateName}/
-                └── {TemplateName}.toml
+                └── {TemplateName}.json
         """
         from .py_exporter import PyExporter
 
         PyExporter.export(self, output_dir, mode=mode)
+
+    @classmethod
+    def py_fmt_import(
+        cls,
+        input_dir: str,
+        *,
+        mode: str = "auto",
+        trusted: bool = False,
+        output_xml_path: str = None,
+        indent: int = 4,
+        overwrite: bool = False
+    ) -> UModel:
+        """Import a UModel from a pyfmt directory.
+
+        Args:
+            input_dir: Path to the pyfmt directory.
+            mode: Import mode - "auto", "machine", or "human".
+            trusted: Allow execution of Python code (required for human mode).
+            output_xml_path: Optional path to write XML file.
+            indent: XML indentation (default 4).
+            overwrite: Whether to overwrite existing XML file.
+
+        Returns:
+            UModel: Imported UModel instance.
+        """
+        from .py_importer import PyImporter
+
+        return PyImporter.import_dir(
+            input_dir,
+            mode=mode,
+            trusted=trusted,
+            output_xml_path=output_xml_path,
+            indent=indent,
+            overwrite=overwrite
+        )
 
     # endregion 基础的文件保存功能
 
@@ -441,7 +541,15 @@ system Process;
 
         Returns:
             str: terminal verify results for `self`.
+
+        Raises:
+            ValueError: If model_path is None.
         """
+        if self.model_path is None:
+            raise ValueError(
+                "Cannot verify: model_path is None. "
+                "Use save_as(path) to save the model first."
+            )
         return Verifyta().verify(
             self.model_path, trace_path, verify_options, keep_tmp_file, timeout=timeout
         )

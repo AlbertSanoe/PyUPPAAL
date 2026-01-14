@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import re
 import keyword
+import json
 from typing import List, Dict, Tuple, Literal, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -41,7 +42,7 @@ class PyExporter:
         Args:
             umodel: The UModel instance to export.
             output_dir: Output directory path.
-            mode: Export mode - "human" for Python code, "machine" for TOML data.
+            mode: Export mode - "human" for Python code, "machine" for structured data.
             overwrite: If False, raises error when output_dir is non-empty.
 
         Raises:
@@ -70,13 +71,13 @@ class PyExporter:
             output_dir/
             ├── manifest.toml
             ├── decl/
-            │   └── decl.toml
+            │   └── decl.json
             ├── sys_decl/
-            │   └── sys_decl.toml
+            │   └── sys_decl.json
             ├── queries/
-            │   └── queries.toml
+            │   └── queries.json
             └── {TemplateName}/
-                └── {TemplateName}.toml
+                └── {TemplateName}.json
         """
         # Validate template names
         PyExporter._validate_template_names(umodel.templates)
@@ -685,7 +686,7 @@ class PyExporter:
 
     @staticmethod
     def _export_machine_mode(umodel: "UModel", output_dir: str) -> None:
-        """Export in machine mode (TOML data format).
+        """Export in machine mode (manifest TOML + JSON payload files).
 
         Args:
             umodel: The UModel instance to export.
@@ -694,18 +695,18 @@ class PyExporter:
         # Export manifest.toml
         PyExporter._export_manifest_toml(umodel, output_dir)
 
-        # Export decl.toml
-        PyExporter._export_decl_toml(umodel.declaration, output_dir)
+        # Export decl.json
+        PyExporter._export_decl_json(umodel.declaration, output_dir)
 
-        # Export sys_decl.toml
-        PyExporter._export_sys_decl_toml(umodel.system, output_dir)
+        # Export sys_decl.json
+        PyExporter._export_sys_decl_json(umodel.system, output_dir)
 
-        # Export queries.toml
-        PyExporter._export_queries_toml(umodel.queries, output_dir)
+        # Export queries.json
+        PyExporter._export_queries_json(umodel.queries, output_dir)
 
         # Export each template to its own subdirectory
         for template in umodel.templates:
-            PyExporter._export_template_toml(template, output_dir)
+            PyExporter._export_template_json(template, output_dir)
 
     @staticmethod
     def _export_manifest_toml(umodel: "UModel", output_dir: str) -> None:
@@ -717,19 +718,19 @@ class PyExporter:
         """
         lines = [
             'format = "pyuppaal-pyfmt"',
-            'format_version = 1',
+            'format_version = 2',
             '',
             '[paths]',
-            'decl = "decl/decl.toml"',
-            'sys_decl = "sys_decl/sys_decl.toml"',
-            'queries = "queries/queries.toml"',
+            'decl = "decl/decl.json"',
+            'sys_decl = "sys_decl/sys_decl.json"',
+            'queries = "queries/queries.json"',
             '',
         ]
 
         for template in umodel.templates:
             lines.append('[[templates]]')
             lines.append(f'name = "{template.name}"')
-            lines.append(f'path = "{template.name}/{template.name}.toml"')
+            lines.append(f'path = "{template.name}/{template.name}.json"')
             lines.append('')
 
         manifest_path = os.path.join(output_dir, "manifest.toml")
@@ -808,6 +809,147 @@ class PyExporter:
         queries_path = os.path.join(queries_dir, "queries.toml")
         with open(queries_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
+
+    @staticmethod
+    def _export_decl_json(declaration: str, output_dir: str) -> None:
+        """Generate decl/decl.json for machine mode."""
+        decl_dir = os.path.join(output_dir, "decl")
+        os.makedirs(decl_dir, exist_ok=True)
+
+        decl_path = os.path.join(decl_dir, "decl.json")
+        with open(decl_path, "w", encoding="utf-8") as f:
+            json.dump({"declaration": declaration or ""}, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+    @staticmethod
+    def _export_sys_decl_json(system: str, output_dir: str) -> None:
+        """Generate sys_decl/sys_decl.json for machine mode."""
+        sys_decl_dir = os.path.join(output_dir, "sys_decl")
+        os.makedirs(sys_decl_dir, exist_ok=True)
+
+        sys_decl_path = os.path.join(sys_decl_dir, "sys_decl.json")
+        with open(sys_decl_path, "w", encoding="utf-8") as f:
+            json.dump({"system": system or ""}, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+    @staticmethod
+    def _export_queries_json(queries: List[str], output_dir: str) -> None:
+        """Generate queries/queries.json for machine mode."""
+        queries_dir = os.path.join(output_dir, "queries")
+        os.makedirs(queries_dir, exist_ok=True)
+
+        queries_path = os.path.join(queries_dir, "queries.json")
+        with open(queries_path, "w", encoding="utf-8") as f:
+            json.dump({"queries": queries or []}, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+    @staticmethod
+    def _export_template_json(template: "Template", output_dir: str) -> None:
+        """Export a single template as JSON file."""
+        name = template.name
+        template_dir = os.path.join(output_dir, name)
+        os.makedirs(template_dir, exist_ok=True)
+
+        loc_id_to_pos = {loc.location_id: loc.location_pos for loc in template.locations}
+
+        data: dict = {
+            "name": name,
+            "init_ref": template.init_ref,
+        }
+        if template.params:
+            data["params"] = template.params
+        if template.declaration:
+            data["local_decl"] = template.declaration
+
+        locations = []
+        for loc in template.locations:
+            loc_obj = {
+                "id": loc.location_id,
+                "pos": [loc.location_pos[0], loc.location_pos[1]],
+            }
+            if loc.name is not None:
+                loc_obj["name"] = loc.name
+            if loc.name_pos is not None:
+                loc_obj["name_pos"] = [loc.name_pos[0], loc.name_pos[1]]
+            if loc.invariant is not None:
+                loc_obj["invariant"] = loc.invariant
+            if loc.invariant_pos is not None:
+                loc_obj["invariant_pos"] = [loc.invariant_pos[0], loc.invariant_pos[1]]
+            if loc.rate_of_exponential is not None:
+                loc_obj["rate_of_exponential"] = loc.rate_of_exponential
+            if loc.rate_of_exp_pos is not None:
+                loc_obj["rate_of_exp_pos"] = [loc.rate_of_exp_pos[0], loc.rate_of_exp_pos[1]]
+
+            if loc.location_id == template.init_ref:
+                loc_obj["is_initial"] = True
+            if loc.is_urgent:
+                loc_obj["urgent"] = True
+            if loc.is_committed:
+                loc_obj["committed"] = True
+            if loc.is_branchpoint:
+                loc_obj["branchpoint"] = True
+
+            if loc.comments is not None:
+                loc_obj["comments"] = loc.comments
+            if loc.comments_pos is not None:
+                loc_obj["comments_pos"] = [loc.comments_pos[0], loc.comments_pos[1]]
+            if loc.test_code_on_enter is not None:
+                loc_obj["test_code_on_enter"] = loc.test_code_on_enter
+            if loc.test_code_on_exit is not None:
+                loc_obj["test_code_on_exit"] = loc.test_code_on_exit
+
+            locations.append(loc_obj)
+
+        edges = []
+        for edge in template.edges:
+            source_pos = loc_id_to_pos.get(edge.source_location_id, edge.source_location_pos)
+            target_pos = loc_id_to_pos.get(edge.target_location_id, edge.target_location_pos)
+
+            edge_obj = {
+                "source_id": edge.source_location_id,
+                "target_id": edge.target_location_id,
+                "source_pos": [source_pos[0], source_pos[1]],
+                "target_pos": [target_pos[0], target_pos[1]],
+            }
+
+            if edge.select is not None:
+                edge_obj["select"] = edge.select
+            if edge.select_pos is not None:
+                edge_obj["select_pos"] = [edge.select_pos[0], edge.select_pos[1]]
+            if edge.sync is not None:
+                edge_obj["sync"] = edge.sync
+            if edge.sync_pos is not None:
+                edge_obj["sync_pos"] = [edge.sync_pos[0], edge.sync_pos[1]]
+            if edge.update is not None:
+                edge_obj["update"] = edge.update
+            if edge.update_pos is not None:
+                edge_obj["update_pos"] = [edge.update_pos[0], edge.update_pos[1]]
+            if edge.guard is not None:
+                edge_obj["guard"] = edge.guard
+            if edge.guard_pos is not None:
+                edge_obj["guard_pos"] = [edge.guard_pos[0], edge.guard_pos[1]]
+            if edge.probability_weight is not None:
+                edge_obj["probability_weight"] = edge.probability_weight
+            if edge.prob_weight_pos is not None:
+                edge_obj["prob_weight_pos"] = [edge.prob_weight_pos[0], edge.prob_weight_pos[1]]
+            if edge.comments is not None:
+                edge_obj["comments"] = edge.comments
+            if edge.comments_pos is not None:
+                edge_obj["comments_pos"] = [edge.comments_pos[0], edge.comments_pos[1]]
+            if edge.test_code is not None:
+                edge_obj["test_code"] = edge.test_code
+            if edge.nails:
+                edge_obj["nails"] = [[n[0], n[1]] for n in edge.nails]
+
+            edges.append(edge_obj)
+
+        data["locations"] = locations
+        data["edges"] = edges
+
+        template_path = os.path.join(template_dir, f"{name}.json")
+        with open(template_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
 
     @staticmethod
     def _export_template_toml(template: "Template", output_dir: str) -> None:
