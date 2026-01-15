@@ -150,3 +150,7 @@ plans/
 src/test_trial/basic/output/
 src/test_trial/py_format/output/
 src/test_trial/**/*.xml
+
+AGENTS.md
+CLAUDE.md
+.claude/

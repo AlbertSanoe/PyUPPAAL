@@ -28,31 +28,48 @@ class UModel:
     """Load UPPAAL model for analysis, editing, verification and other operations. If you want to modify the model, you should `from pyuppaal.nta import Template, Location, Edge`."""
 
     def __init__(self, model_path: str = None):
-        """_summary_
+        """从 XML 文件路径初始化 UModel。
 
         Args:
-            model_path (str): model path. Defaults to None.
-        """
-        self.__declaration: str = "// Place global declarations here."
-        self.__templates: List[Template] = []
-        self.__system: str = "system cannot be None"
-        self.__queries: List[str] | None = None
-        self.__model_path: str = model_path
-        self._autosave: bool = True  # Control automatic saving on property changes
+            model_path (str): UPPAAL XML 模型文件路径。默认为 None。
 
+        Raises:
+            ValueError: 如果 model_path 不存在。
+        """
+        # 处理 None 路径（遗留行为）
         if model_path is None:
             print(
-                "Warning: model_path is None, create a new model named 'untiteled.xml' in current directory"
+                "Warning: model_path is None, create a new model named 'untitled.xml' in current directory"
             )
             model_path = "untitled.xml"
-            self.__model_path = model_path
-            self = UModel.new(model_path)
+            new_model = UModel.new(model_path)
+            self._init_from_components(
+                declaration=new_model.declaration,
+                templates=new_model.templates,
+                system=new_model.system,
+                queries=new_model.queries if new_model.queries else [],
+                model_path=new_model.model_path,
+                autosave=True
+            )
+            return
 
+        # 验证路径存在
         if not os.path.exists(model_path):
             err_info = f"Model path: {model_path} does not exist.\n"
             raise ValueError(err_info)
-        # 解构xml
-        self.__build()
+
+        # 解析 XML（无副作用）
+        declaration, templates, system, queries = UModel._parse_xml(model_path)
+
+        # 通过统一 API 初始化
+        self._init_from_components(
+            declaration=declaration,
+            templates=templates,
+            system=system,
+            queries=queries,
+            model_path=model_path,
+            autosave=True
+        )
 
     @classmethod
     def from_components(
@@ -63,30 +80,96 @@ class UModel:
         queries: List[str] = None,
         model_path: str = None
     ) -> UModel:
-        """Create a UModel from components without requiring an XML file.
+        """从组件创建 UModel，无需 XML 文件。
 
-        This method allows constructing a UModel directly from its components,
-        bypassing the need for an existing XML file. Useful for importing from
-        pyfmt directories or programmatic model construction.
+        允许直接从组件构建 UModel，绕过对现有 XML 文件的需求。
+        适用于从 pyfmt 目录导入或程序化模型构建。
 
         Args:
-            declaration: Global declarations string.
-            templates: List of Template objects.
-            system: System declaration string.
-            queries: List of query strings. Defaults to None.
-            model_path: Optional path for the model. Defaults to None.
+            declaration: 全局声明字符串
+            templates: Template 对象列表
+            system: 系统声明字符串
+            queries: 查询字符串列表。默认为空列表
+            model_path: 可选的模型路径。默认为 None
 
         Returns:
-            UModel: A new UModel instance with autosave disabled.
+            UModel: 禁用 autosave 的新 UModel 实例
         """
-        u = object.__new__(cls)
-        u._UModel__declaration = declaration
-        u._UModel__templates = templates
-        u._UModel__system = system
-        u._UModel__queries = queries
-        u._UModel__model_path = model_path
-        u._autosave = False  # Disable autosave for in-memory models
-        return u
+        # 规范化 queries 为列表
+        if queries is None:
+            queries = []
+
+        # 使用 object.__new__ 跳过 __init__，然后通过统一 API 初始化
+        instance = object.__new__(cls)
+        instance._init_from_components(
+            declaration=declaration,
+            templates=templates,
+            system=system,
+            queries=queries,
+            model_path=model_path,
+            autosave=False
+        )
+        return instance
+
+    def _init_from_components(
+        self,
+        declaration: str,
+        templates: List[Template],
+        system: str,
+        queries: List[str],
+        model_path: str | None,
+        autosave: bool
+    ) -> None:
+        """统一的内部初始化方法。
+
+        所有构建路径（XML 和组件）都通过此方法设置属性，确保一致性。
+
+        Args:
+            declaration: 全局声明字符串
+            templates: Template 对象列表
+            system: 系统声明字符串
+            queries: 查询字符串列表（永不为 None，空时使用 []）
+            model_path: 模型文件路径（内存模型可为 None）
+            autosave: 是否启用属性变更时自动保存
+        """
+        self._UModel__declaration = declaration
+        self._UModel__templates = templates
+        self._UModel__system = system
+        self._UModel__queries = queries
+        self._UModel__model_path = model_path
+        self._autosave = autosave
+
+    @staticmethod
+    def _parse_xml(model_path: str) -> tuple:
+        """解析 XML 文件并返回组件，无副作用。
+
+        纯函数：只读取 XML 文件并返回解析后的组件，不修改任何文件或状态。
+
+        Args:
+            model_path: UPPAAL XML 模型文件路径
+
+        Returns:
+            tuple: (declaration, templates, system, queries)
+        """
+        element_tree = ET.ElementTree(file=model_path)
+
+        # 1. declaration
+        decl_elem = element_tree.find("declaration")
+        declaration = decl_elem.text if decl_elem is not None and decl_elem.text else ""
+
+        # 2. templates
+        template_elems = element_tree.findall("./template")
+        templates = [Template.from_xml(t) for t in template_elems]
+
+        # 3. system
+        sys_elem = element_tree.find("system")
+        system = sys_elem.text if sys_elem is not None and sys_elem.text else ""
+
+        # 4. queries - 始终返回列表，永不为 None
+        query_formula_elems = element_tree.findall("./queries/query/formula")
+        queries = [q.text for q in query_formula_elems if q.text]
+
+        return declaration, templates, system, queries
 
     @contextmanager
     def no_autosave(self):
@@ -155,7 +238,7 @@ class UModel:
 
     # region ======== queries ========
     @property
-    def queries(self) -> List[str] | None:
+    def queries(self) -> List[str]:
         return self.__queries
 
     @queries.setter
@@ -291,31 +374,6 @@ class UModel:
             # ==== END: 构建单个query element ====
             queries_elem.append(query_elem)
         return queries_elem
-
-    def __build(self) -> None:
-        """解构xml, 获得self的各种属性, 比如:
-        1. declaration,
-        2. templates,
-        3. system,
-        4. queries等.
-        """
-        element_tree = ET.ElementTree(file=self.model_path)
-
-        # 1. declaration
-        self.__declaration = element_tree.find("declaration").text
-
-        # 2. templates
-        template_elems = element_tree.findall("./template")
-        self.__templates = [Template.from_xml(t) for t in template_elems]
-
-        # 3. system
-        self.__system = element_tree.find("system").text
-
-        # 4. queries
-        query_formula_elems = element_tree.findall("./queries/query/formula")
-        self.__queries = [query_elem.text for query_elem in query_formula_elems]
-
-        self.save()
 
     # endregion 解构(build)
 
