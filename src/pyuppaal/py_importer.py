@@ -98,8 +98,7 @@ class PyImporter:
             declaration=declaration,
             templates=templates,
             system=system,
-            queries=queries,
-            model_path=output_xml_path
+            queries=queries
         )
 
         # Write XML if requested

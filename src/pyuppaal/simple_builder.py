@@ -143,7 +143,6 @@ class ModelBuilder:
         declaration: str = "",
         system: str = "",
         queries: Optional[List[str]] = None,
-        model_path: Optional[str] = None,
     ) -> UModel:
         if queries is None:
             queries = []
@@ -153,7 +152,6 @@ class ModelBuilder:
             templates=templates,
             system=system,
             queries=queries,
-            model_path=model_path,
         )
 
 

@@ -77,8 +77,7 @@ class UModel:
         declaration: str,
         templates: List[Template],
         system: str,
-        queries: List[str] = None,
-        model_path: str = None
+        queries: List[str] = None
     ) -> UModel:
         """从组件创建 UModel，无需 XML 文件。
 
@@ -90,7 +89,6 @@ class UModel:
             templates: Template 对象列表
             system: 系统声明字符串
             queries: 查询字符串列表。默认为空列表
-            model_path: 可选的模型路径。默认为 None
 
         Returns:
             UModel: 禁用 autosave 的新 UModel 实例
@@ -106,7 +104,7 @@ class UModel:
             templates=templates,
             system=system,
             queries=queries,
-            model_path=model_path,
+            model_path=None,
             autosave=False
         )
         return instance

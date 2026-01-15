@@ -53,8 +53,7 @@ model = UModel.from_components(
     declaration=declaration,
     templates=templates,
     system=system,
-    queries=queries,
-    model_path=None  # Optional: specify path for later saving
+    queries=queries
 )
 ```
 
@@ -181,7 +180,7 @@ model.queries = "A[] not deadlock"
 
 ---
 
-### `from_components(declaration, templates, system, queries=None, model_path=None)`
+### `from_components(declaration, templates, system, queries=None)`
 
 Class method for creating models from components without requiring an XML file.
 
@@ -190,7 +189,6 @@ Class method for creating models from components without requiring an XML file.
 - `templates` (List[Template]): List of Template objects
 - `system` (str): System declaration string
 - `queries` (List[str], optional): Query strings list. Defaults to `None` (becomes `[]`)
-- `model_path` (str, optional): Optional model path for later saving. Defaults to `None`
 
 **Returns:**
 - `UModel`: New UModel instance with autosave disabled
@@ -397,7 +395,7 @@ instance._init_from_components(
 The refactoring maintains backward compatibility for all public APIs:
 
 - `UModel(model_path)` works exactly as before
-- `UModel.from_components()` has the same signature
+- `UModel.from_components()` no longer accepts `model_path` parameter (removed)
 - All properties (`declaration`, `templates`, `system`, `queries`) behave identically
 - The only difference: `queries` never returns `None` (always returns `[]` when empty)
 

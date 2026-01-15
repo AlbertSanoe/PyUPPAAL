@@ -126,8 +126,7 @@ class TestConstructionConsistency:
             declaration=umodel_xml.declaration,
             templates=umodel_xml.templates,
             system=umodel_xml.system,
-            queries=umodel_xml.queries,
-            model_path=model_path
+            queries=umodel_xml.queries
         )
 
         assert umodel_comp.declaration == umodel_xml.declaration
