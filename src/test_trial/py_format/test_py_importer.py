@@ -7,7 +7,8 @@ from pyuppaal.py_exporter import PyExporter
 
 # Paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(SCRIPT_DIR, "ros2_v01_20251021_temp.xml")
+TEST_TRIAL_DIR = os.path.dirname(SCRIPT_DIR)
+MODEL_PATH = os.path.join(TEST_TRIAL_DIR, "ros2_v01_20251021_temp.xml")
 INPUT_HUMAN = os.path.join(SCRIPT_DIR, "output", "test_human")
 INPUT_MACHINE = os.path.join(SCRIPT_DIR, "output", "test_machine")
 

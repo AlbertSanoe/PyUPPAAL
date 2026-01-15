@@ -146,7 +146,7 @@ src/test_integration/uppaal
 bin/
 plans/
 
-# test_trial - keep folder but ignore output and xml files
-src/test_trial/output/
-src/test_trial/output_py_export/
+# test_trial - ignore output folders and xml files
+src/test_trial/basic/output/
+src/test_trial/py_format/output/
 src/test_trial/**/*.xml

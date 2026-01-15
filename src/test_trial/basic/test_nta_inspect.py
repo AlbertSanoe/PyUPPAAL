@@ -30,7 +30,7 @@ import os
 import sys
 
 # 添加 src 目录到 Python 路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import pyuppaal as pyu
 from pyuppaal.nta import Template, Location, Edge
@@ -38,8 +38,10 @@ from pyuppaal.nta import Template, Location, Edge
 
 # 获取当前脚本所在目录
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# test_trial 目录
+TEST_TRIAL_DIR = os.path.dirname(SCRIPT_DIR)
 # 测试模型路径
-TEST_MODEL_PATH = os.path.join(SCRIPT_DIR, "ros2_v01_20251021_temp.xml")
+TEST_MODEL_PATH = os.path.join(TEST_TRIAL_DIR, "ros2_v01_20251021_temp.xml")
 
 
 def print_separator(title: str, char: str = "=", width: int = 80):
