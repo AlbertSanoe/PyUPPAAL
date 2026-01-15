@@ -501,12 +501,13 @@ system Process;
         self.ElementTree.write(new_path, encoding="utf-8", xml_declaration=True)
         return UModel(new_path)
 
-    def py_fmt_export(self, output_dir: str, mode: str = "human") -> None:
+    def py_fmt_export(self, output_dir: str, mode: str = "human", overwrite: bool = False) -> None:
         """Export model to Python format folder structure.
 
         Args:
             output_dir: Output directory path.
             mode: Export mode - "human" for Python code, "machine" for structured data.
+            overwrite: If True, overwrite existing files in output directory.
 
         Generated directory structure (human mode):
             output_dir/
@@ -540,7 +541,7 @@ system Process;
         """
         from .py_exporter import PyExporter
 
-        PyExporter.export(self, output_dir, mode=mode)
+        PyExporter.export(self, output_dir, mode=mode, overwrite=overwrite)
 
     @classmethod
     def py_fmt_import(
