@@ -57,6 +57,8 @@ def test_cg():
 def test_all_patterns():
     """_summary_
     """
+    # NOTE: This test requires 'pedestrian_new.xml' to exist in this folder.
+    # If the file is missing, UModel(...) will raise a path-not-found error.
     query = f'E<> (PPedestrian.Crossing and PCar.Crossing)'  # property query
     focused_actions = ["pCheckLight", "pGreen",
                        "pRed", "pYellow", "pCrss", "cCrss"]
