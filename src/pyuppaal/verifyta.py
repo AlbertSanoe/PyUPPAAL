@@ -225,6 +225,70 @@ class Verifyta:
 
         return if_path
 
+    def syntax_check(self, model_path: str, timeout: float = None, detail: bool = False) -> tuple[bool, str]:
+        """Check the syntax of the UPPAAL model without executing queries.
+
+        Uses UPPAAL_COMPILE_ONLY environment variable to compile the model
+        and check for syntax errors without running any verification.
+
+        Args:
+            model_path (str): `.xml` model file path.
+            timeout (float, optional): timeout in seconds for the command execution.
+            detail (bool, optional): if True, return compilation output on success. Defaults to False.
+
+        Returns:
+            tuple[bool, str]: (success, message)
+                - success: True if syntax is correct, False otherwise
+                - message: Compilation output if success and detail=True, error message if failed
+
+        Raises:
+            FileNotFoundError: if model_path not found.
+            ValueError: if model_path is not a `.xml` file.
+
+        Examples:
+            >>> Verifyta().set_verifyta_path(VERIFYTA_PATH)
+            >>> success, msg = Verifyta().syntax_check('model.xml')
+            >>> if success:
+            ...     print("Syntax OK")
+            ... else:
+            ...     print(f"Syntax Error: {msg}")
+        """
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f'model_path {model_path} not found.')
+
+        _, file_ext = os.path.splitext(model_path)
+        if file_ext != '.xml':
+            raise ValueError(f'model_path {model_path} should be xml format file.')
+
+        # Set UPPAAL_COMPILE_ONLY to compile without verification
+        if self._Verifyta__operating_system == "Windows":
+            cmd_env = "set UPPAAL_COMPILE_ONLY=1"
+            cmd = f'{cmd_env} && {self._Verifyta__verifyta_path} {model_path}'
+        else:
+            cmd_env = "UPPAAL_COMPILE_ONLY=1"
+            cmd = f'{cmd_env} {self._Verifyta__verifyta_path} {model_path}'
+
+        try:
+            cmd_res = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True,
+                check=False, timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            return False, f"Syntax check timed out after {timeout} seconds"
+
+        # Check for errors in stderr
+        if cmd_res.stderr and '[error]' in cmd_res.stderr.lower():
+            return False, cmd_res.stderr.strip()
+
+        # Check return code
+        if cmd_res.returncode != 0 and cmd_res.stderr:
+            return False, cmd_res.stderr.strip()
+
+        # Success - return compilation output only if detail=True
+        if detail:
+            return True, cmd_res.stdout.strip() if cmd_res.stdout else ""
+        return True, ""
+
     def verify(self, model_path: str, trace_path: str = None, verify_options: str = "-t 1", keep_tmp_file=True, timeout: float = None) -> str:
         """
         Verify model and return the verify result as list.
