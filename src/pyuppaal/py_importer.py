@@ -22,7 +22,7 @@ from .nta import Location, Edge, Template
 
 
 # Reserved directory names that cannot be used as template names
-RESERVED_DIRS = frozenset({'decl', 'sys_decl', 'queries', '__pycache__'})
+RESERVED_DIRS = frozenset({"decl", "sys_decl", "queries", "__pycache__"})
 
 # Format constants
 EXPECTED_FORMAT = "pyuppaal-pyfmt"
@@ -40,7 +40,7 @@ class PyImporter:
         trusted: bool = False,
         output_xml_path: Optional[str] = None,
         indent: int = 4,
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> "UModel":
         """
         Import a UModel from a pyfmt directory.
@@ -85,20 +85,27 @@ class PyImporter:
 
         # Load components based on mode
         if mode == "machine":
-            declaration, system, queries, templates = PyImporter._load_machine_mode(input_dir)
+            declaration, system, queries, query_comments, templates = (
+                PyImporter._load_machine_mode(input_dir)
+            )
         else:  # human
-            declaration, system, queries, templates = PyImporter._load_human_mode(input_dir)
+            declaration, system, queries, query_comments, templates = (
+                PyImporter._load_human_mode(input_dir)
+            )
+        query_comments = PyImporter._normalize_query_comments(queries, query_comments)
 
         # Validate components
         PyImporter._validate_components(declaration, system, queries, templates)
 
         # Build UModel
         from .umodel import UModel
+
         umodel = UModel.from_components(
             declaration=declaration,
             templates=templates,
             system=system,
-            queries=queries
+            queries=queries,
+            query_comments=query_comments,
         )
 
         # Write XML if requested
@@ -130,7 +137,9 @@ class PyImporter:
     # ========== Machine Mode Loading ==========
 
     @staticmethod
-    def _load_machine_mode(input_dir: str) -> Tuple[str, str, List[str], List[Template]]:
+    def _load_machine_mode(
+        input_dir: str,
+    ) -> Tuple[str, str, List[str], List[str], List[Template]]:
         """Load components from machine mode directory."""
         manifest_path = os.path.join(input_dir, "manifest.toml")
         manifest = PyImporter._load_manifest(manifest_path)
@@ -143,9 +152,9 @@ class PyImporter:
         sys_decl_path = os.path.join(input_dir, manifest["paths"]["sys_decl"])
         system = PyImporter._load_sys_decl_json(sys_decl_path)
 
-        # Load queries
+        # Load queries + comments
         queries_path = os.path.join(input_dir, manifest["paths"]["queries"])
-        queries = PyImporter._load_queries_json(queries_path)
+        queries, query_comments = PyImporter._load_queries_json(queries_path)
 
         # Load templates
         templates = []
@@ -154,7 +163,7 @@ class PyImporter:
             template = PyImporter._load_template_json(tmpl_path, tmpl_info["name"])
             templates.append(template)
 
-        return declaration, system, queries, templates
+        return declaration, system, queries, query_comments, templates
 
     @staticmethod
     def _load_manifest(manifest_path: str) -> dict:
@@ -206,7 +215,9 @@ class PyImporter:
     def _load_sys_decl_json(sys_decl_path: str) -> str:
         """Load system declaration from JSON file."""
         if not os.path.isfile(sys_decl_path):
-            raise FileNotFoundError(f"System declaration file not found: {sys_decl_path}")
+            raise FileNotFoundError(
+                f"System declaration file not found: {sys_decl_path}"
+            )
 
         with open(sys_decl_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -214,15 +225,22 @@ class PyImporter:
         return data.get("system", "")
 
     @staticmethod
-    def _load_queries_json(queries_path: str) -> List[str]:
-        """Load queries from JSON file."""
+    def _load_queries_json(queries_path: str) -> Tuple[List[str], List[str]]:
+        """Load queries and query comments from JSON file."""
         if not os.path.isfile(queries_path):
             raise FileNotFoundError(f"Queries file not found: {queries_path}")
 
         with open(queries_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        return data.get("queries", [])
+        queries = data.get("queries", [])
+        if not isinstance(queries, list):
+            raise ValueError("queries.json: 'queries' must be a list")
+        query_comments = data.get("query_comments")
+        if query_comments is not None and not isinstance(query_comments, list):
+            query_comments = None
+        query_comments = PyImporter._normalize_query_comments(queries, query_comments)
+        return queries, query_comments
 
     @staticmethod
     def _load_template_json(template_path: str, expected_name: str) -> Template:
@@ -272,11 +290,13 @@ class PyImporter:
             init_ref=init_ref,
             edges=edges,
             params=params,
-            declaration=local_decl
+            declaration=local_decl,
         )
 
     @staticmethod
-    def _parse_locations(locations_data: List[dict], template_name: str) -> List[Location]:
+    def _parse_locations(
+        locations_data: List[dict], template_name: str
+    ) -> List[Location]:
         """Parse locations from TOML data."""
         locations = []
         seen_ids = set()
@@ -347,7 +367,7 @@ class PyImporter:
                 comments=comments,
                 comments_pos=comments_pos,
                 test_code_on_enter=test_code_on_enter,
-                test_code_on_exit=test_code_on_exit
+                test_code_on_exit=test_code_on_exit,
             )
             locations.append(location)
 
@@ -355,9 +375,7 @@ class PyImporter:
 
     @staticmethod
     def _parse_edges(
-        edges_data: List[dict],
-        locations: List[Location],
-        template_name: str
+        edges_data: List[dict], locations: List[Location], template_name: str
     ) -> List[Edge]:
         """Parse edges from TOML data."""
         # Build location lookup
@@ -458,7 +476,7 @@ class PyImporter:
                 comments=comments,
                 comments_pos=comments_pos,
                 test_code=test_code,
-                nails=nails
+                nails=nails,
             )
             edges.append(edge)
 
@@ -467,7 +485,9 @@ class PyImporter:
     # ========== Human Mode Loading ==========
 
     @staticmethod
-    def _load_human_mode(input_dir: str) -> Tuple[str, str, List[str], List[Template]]:
+    def _load_human_mode(
+        input_dir: str,
+    ) -> Tuple[str, str, List[str], List[str], List[Template]]:
         """
         Load components from human mode directory (trusted).
 
@@ -475,14 +495,10 @@ class PyImporter:
         Only use with trusted sources.
         """
         import importlib.util
-        import uuid
 
         registry_path = os.path.join(input_dir, "registry.py")
         if not os.path.isfile(registry_path):
             raise FileNotFoundError(f"Registry file not found: {registry_path}")
-
-        # Generate unique module name to avoid conflicts
-        module_name = f"_pyuppaal_import_{uuid.uuid4().hex[:8]}"
 
         # Add input_dir to sys.path temporarily for relative imports
         parent_dir = os.path.dirname(input_dir)
@@ -498,7 +514,7 @@ class PyImporter:
             spec = importlib.util.spec_from_file_location(
                 f"{pkg_name}.registry",
                 registry_path,
-                submodule_search_locations=[input_dir]
+                submodule_search_locations=[input_dir],
             )
             if spec is None or spec.loader is None:
                 raise ImportError(f"Cannot load registry from {registry_path}")
@@ -509,9 +525,24 @@ class PyImporter:
 
             # Extract data from registry
             templates = PyImporter._get_registry_attr(registry, "ALL_TEMPLATES", list)
-            declaration = PyImporter._get_registry_func(registry, "load_global_declaration")
+            declaration = PyImporter._get_registry_func(
+                registry, "load_global_declaration"
+            )
             system = PyImporter._get_registry_func(registry, "load_system_declaration")
             queries = PyImporter._get_registry_func(registry, "load_queries")
+            if not isinstance(queries, list):
+                raise ValueError("Registry.load_queries() must return list")
+
+            # Load query_comments (backward compat: old dirs may not have it)
+            comments_raw = None
+            if hasattr(registry, "load_query_comments") and callable(
+                registry.load_query_comments
+            ):
+                comments_raw = registry.load_query_comments()
+
+            if comments_raw is not None and not isinstance(comments_raw, list):
+                comments_raw = None
+            query_comments = PyImporter._normalize_query_comments(queries, comments_raw)
 
         except Exception as e:
             raise ImportError(
@@ -526,7 +557,25 @@ class PyImporter:
             for k in to_remove:
                 del sys.modules[k]
 
-        return declaration, system, queries, templates
+        return declaration, system, queries, query_comments, templates
+
+    @staticmethod
+    def _normalize_query_comments(
+        queries: List[str], query_comments: List[str] | None
+    ) -> List[str]:
+        """Normalize query comments to match the number of queries."""
+        if query_comments is None:
+            return [""] * len(queries)
+
+        normalized = [
+            "" if comment is None else str(comment) for comment in query_comments
+        ]
+        query_count = len(queries)
+        if len(normalized) < query_count:
+            normalized.extend([""] * (query_count - len(normalized)))
+        elif len(normalized) > query_count:
+            normalized = normalized[:query_count]
+        return normalized
 
     @staticmethod
     def _get_registry_attr(registry, attr_name: str, expected_type: type):
@@ -555,10 +604,7 @@ class PyImporter:
 
     @staticmethod
     def _validate_components(
-        declaration: str,
-        system: str,
-        queries: List[str],
-        templates: List[Template]
+        declaration: str, system: str, queries: List[str], templates: List[Template]
     ) -> None:
         """Validate imported components."""
         # Validate templates
@@ -579,15 +625,11 @@ class PyImporter:
 
             # Check name is not a keyword
             if keyword.iskeyword(name):
-                raise ValueError(
-                    f"Template name '{name}' is a Python keyword"
-                )
+                raise ValueError(f"Template name '{name}' is a Python keyword")
 
             # Check name is not reserved
             if name.lower() in RESERVED_DIRS:
-                raise ValueError(
-                    f"Template name '{name}' is reserved"
-                )
+                raise ValueError(f"Template name '{name}' is reserved")
 
             # Check for duplicate names
             if name in seen_names:

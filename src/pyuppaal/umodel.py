@@ -49,7 +49,7 @@ class UModel:
                 system=new_model.system,
                 queries=new_model.queries if new_model.queries else [],
                 model_path=new_model.model_path,
-                autosave=True
+                autosave=True,
             )
             return
 
@@ -59,7 +59,9 @@ class UModel:
             raise ValueError(err_info)
 
         # 解析 XML（无副作用）
-        declaration, templates, system, queries = UModel._parse_xml(model_path)
+        declaration, templates, system, queries, query_comments = UModel._parse_xml(
+            model_path
+        )
 
         # 通过统一 API 初始化
         self._init_from_components(
@@ -67,8 +69,9 @@ class UModel:
             templates=templates,
             system=system,
             queries=queries,
+            query_comments=query_comments,
             model_path=model_path,
-            autosave=True
+            autosave=True,
         )
 
     @classmethod
@@ -77,7 +80,8 @@ class UModel:
         declaration: str,
         templates: List[Template],
         system: str,
-        queries: List[str] = None
+        queries: List[str] = None,
+        query_comments: List[str] | None = None,
     ) -> UModel:
         """从组件创建 UModel，无需 XML 文件。
 
@@ -89,6 +93,7 @@ class UModel:
             templates: Template 对象列表
             system: 系统声明字符串
             queries: 查询字符串列表。默认为空列表
+            query_comments: 查询注释列表，与 queries 一一对应
 
         Returns:
             UModel: 禁用 autosave 的新 UModel 实例
@@ -104,8 +109,9 @@ class UModel:
             templates=templates,
             system=system,
             queries=queries,
+            query_comments=query_comments,
             model_path=None,
-            autosave=False
+            autosave=False,
         )
         return instance
 
@@ -116,7 +122,8 @@ class UModel:
         system: str,
         queries: List[str],
         model_path: str | None,
-        autosave: bool
+        autosave: bool,
+        query_comments: List[str] | None = None,
     ) -> None:
         """统一的内部初始化方法。
 
@@ -129,13 +136,37 @@ class UModel:
             queries: 查询字符串列表（永不为 None，空时使用 []）
             model_path: 模型文件路径（内存模型可为 None）
             autosave: 是否启用属性变更时自动保存
+            query_comments: 查询注释列表，与 queries 一一对应
         """
         self._UModel__declaration = declaration
         self._UModel__templates = templates
         self._UModel__system = system
         self._UModel__queries = queries
+        self._UModel__query_comments = UModel._normalize_query_comments(
+            queries, query_comments
+        )
         self._UModel__model_path = model_path
         self._autosave = autosave
+
+    @staticmethod
+    def _normalize_query_comments(
+        queries: List[str], query_comments: List[str] | None
+    ) -> List[str]:
+        """Normalize query comments to match the number of queries."""
+        if query_comments is None:
+            return [""] * len(queries)
+
+        normalized = [
+            "" if comment is None else str(comment) for comment in query_comments
+        ]
+        query_count = len(queries)
+
+        if len(normalized) < query_count:
+            normalized.extend([""] * (query_count - len(normalized)))
+        elif len(normalized) > query_count:
+            normalized = normalized[:query_count]
+
+        return normalized
 
     @staticmethod
     def _parse_xml(model_path: str) -> tuple:
@@ -147,7 +178,7 @@ class UModel:
             model_path: UPPAAL XML 模型文件路径
 
         Returns:
-            tuple: (declaration, templates, system, queries)
+            tuple: (declaration, templates, system, queries, query_comments)
         """
         element_tree = ET.ElementTree(file=model_path)
 
@@ -163,11 +194,22 @@ class UModel:
         sys_elem = element_tree.find("system")
         system = sys_elem.text if sys_elem is not None and sys_elem.text else ""
 
-        # 4. queries - 始终返回列表，永不为 None
-        query_formula_elems = element_tree.findall("./queries/query/formula")
-        queries = [q.text for q in query_formula_elems if q.text]
+        # 4. queries + query_comments - 始终返回列表，永不为 None
+        query_elems = element_tree.findall("./queries/query")
+        queries: list[str] = []
+        query_comments: list[str] = []
+        for q in query_elems:
+            formula_elem = q.find("formula")
+            comment_elem = q.find("comment")
+            if formula_elem is not None and formula_elem.text:
+                queries.append(formula_elem.text)
+                query_comments.append(
+                    comment_elem.text
+                    if comment_elem is not None and comment_elem.text
+                    else ""
+                )
 
-        return declaration, templates, system, queries
+        return declaration, templates, system, queries, query_comments
 
     @contextmanager
     def no_autosave(self):
@@ -250,9 +292,41 @@ class UModel:
         Args:
             value (str | List[str] | None): target single query, or list of queries.
         """
+        if value is None:
+            self.__queries = None
+            self.__query_comments = []
+            if self._autosave:
+                self.save()
+            return
+
         if isinstance(value, str):
             value = [value]
+        if not isinstance(value, list):
+            err_info = (
+                f"queries requires list[str] | str | None, current is: {type(value)}."
+            )
+            raise ValueError(err_info)
         self.__queries = value
+        self.__query_comments = [""] * len(value) if value else []
+        if self._autosave:
+            self.save()
+
+    # endregion
+
+    # region ======== query_comments ========
+    @property
+    def query_comments(self) -> List[str]:
+        return self.__query_comments
+
+    @query_comments.setter
+    def query_comments(self, value: List[str] | None) -> None:
+        if value is not None and not isinstance(value, list):
+            err_info = (
+                f"query_comments requires list[str] | None, current is: {type(value)}."
+            )
+            raise ValueError(err_info)
+        queries = self.__queries if self.__queries is not None else []
+        self.__query_comments = UModel._normalize_query_comments(queries, value)
         if self._autosave:
             self.save()
 
@@ -356,20 +430,15 @@ class UModel:
     @property
     def __queries_element(self) -> ET.Element:
         queries_elem = ET.Element("queries")
-        # 构建并加入多个queries element
-        for query in self.queries:
-            # ==== START: 构建单个query element ====
-            # 单个query element包含
-            # 1. formula
-            # 2. comment
+        for i, query in enumerate(self.queries):
             query_elem = ET.Element("query")
-            # 添加 1. formula
             formula_elem = ET.Element("formula")
             formula_elem.text = query
             query_elem.append(formula_elem)
-            # 添加 2. comment
-            query_elem.append(ET.Element("comment"))
-            # ==== END: 构建单个query element ====
+            comment_elem = ET.Element("comment")
+            if i < len(self.query_comments) and self.query_comments[i]:
+                comment_elem.text = self.query_comments[i]
+            query_elem.append(comment_elem)
             queries_elem.append(query_elem)
         return queries_elem
 
@@ -426,11 +495,10 @@ system Process;
 		</query>
 	</queries>
 </nta>
-"""
+        """
         et = ET.fromstring(xml_base)
         tree = ET.ElementTree(et)
-        with open(model_path, "w", encoding="utf-8") as f:
-            tree.write(model_path, encoding="utf-8", xml_declaration=True)
+        tree.write(model_path, encoding="utf-8", xml_declaration=True)
         res = UModel(model_path=model_path)
         return res
 
@@ -501,7 +569,9 @@ system Process;
         self.ElementTree.write(new_path, encoding="utf-8", xml_declaration=True)
         return UModel(new_path)
 
-    def py_fmt_export(self, output_dir: str, mode: str = "human", overwrite: bool = False) -> None:
+    def py_fmt_export(
+        self, output_dir: str, mode: str = "human", overwrite: bool = False
+    ) -> None:
         """Export model to Python format folder structure.
 
         Args:
@@ -552,7 +622,7 @@ system Process;
         trusted: bool = False,
         output_xml_path: str = None,
         indent: int = 4,
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> UModel:
         """Import a UModel from a pyfmt directory.
 
@@ -575,7 +645,7 @@ system Process;
             trusted=trusted,
             output_xml_path=output_xml_path,
             indent=indent,
-            overwrite=overwrite
+            overwrite=overwrite,
         )
 
     # endregion 基础的文件保存功能
@@ -1110,9 +1180,9 @@ system Process;
                 all_patterns=True,
             )
 
-            query_str = " && ".join([
-                f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)
-            ])
+            query_str = " && ".join(
+                [f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)]
+            )
             query_str = f"{default_query} && {query_str}"
 
             new_umodel.queries = query_str
@@ -1484,10 +1554,10 @@ system Process;
             observer_template: Template = new_umodel.templates.pop()
             idx = 0
             target_location_id = -1
-            for i, l in enumerate(observer_template.locations):
-                if l.name == "fail0":
+            for i, location in enumerate(observer_template.locations):
+                if location.name == "fail0":
                     idx = i
-                    target_location_id = l.location_id
+                    target_location_id = location.location_id
                     break
             del observer_template.locations[idx]
 
@@ -1505,9 +1575,9 @@ system Process;
             # 构造验证语句
             # 构造monitor.pass
             # E<> Monitor0.pass & !Monitor1.pass
-            query_str = " && ".join([
-                f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)
-            ])
+            query_str = " && ".join(
+                [f"!all_patterns_monitor_{i}.pass" for i in range(1, monitor_id + 1)]
+            )
             # E<> !Monitor0.pass & !Monitor1.pass
             query_str = f"{default_query} && {query_str}"
 

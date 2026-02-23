@@ -15,12 +15,10 @@ if TYPE_CHECKING:
     from .nta import Template, Location, Edge
 
 # Reserved directory names that cannot be used as template names
-RESERVED_NAMES = frozenset({
-    "decl", "sys_decl", "queries", "__pycache__", "templates"
-})
+RESERVED_NAMES = frozenset({"decl", "sys_decl", "queries", "__pycache__", "templates"})
 
 # Valid template name pattern: must be a valid Python identifier
-VALID_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+VALID_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class PyExporter:
@@ -35,7 +33,7 @@ class PyExporter:
         umodel: "UModel",
         output_dir: str,
         mode: Literal["human", "machine"] = "human",
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> None:
         """Main export interface.
 
@@ -116,7 +114,7 @@ class PyExporter:
         PyExporter._export_system_declaration(umodel.system, output_dir)
 
         # Export queries
-        PyExporter._export_queries(umodel.queries, output_dir)
+        PyExporter._export_queries(umodel.queries, output_dir, umodel.query_comments)
 
         # Export each template (using Template.name directly)
         for template in umodel.templates:
@@ -177,18 +175,23 @@ class PyExporter:
             f.write(system if system else "")
 
     @staticmethod
-    def _export_queries(queries: List[str], output_dir: str) -> None:
+    def _export_queries(
+        queries: List[str],
+        output_dir: str,
+        query_comments: List[str] | None = None,
+    ) -> None:
         """Export queries to queries/queries.py.
 
         Args:
             queries: List of query strings.
             output_dir: Output directory path.
+            query_comments: List of query comment strings.
         """
         queries_dir = os.path.join(output_dir, "queries")
         os.makedirs(queries_dir, exist_ok=True)
 
         # Write __init__.py with import
-        init_content = "from .queries import QUERIES\n"
+        init_content = "from .queries import QUERIES, QUERY_COMMENTS\n"
         PyExporter._write_init_py(queries_dir, init_content)
 
         # Generate queries.py content
@@ -203,10 +206,18 @@ class PyExporter:
             for query in queries:
                 if query is None:
                     continue
-                # Use triple quotes for multiline strings
                 escaped_query = PyExporter._escape_triple_quote_string(query)
                 lines.append(f'    """{escaped_query}""",')
 
+        lines.append("]")
+        lines.append("")
+
+        # Generate QUERY_COMMENTS list
+        comments = PyExporter._normalize_query_comments(queries, query_comments)
+        lines.append("QUERY_COMMENTS = [")
+        for comment in comments:
+            escaped = PyExporter._escape_triple_quote_string(comment or "")
+            lines.append(f'    """{escaped}""",')
         lines.append("]")
         lines.append("")
 
@@ -299,7 +310,7 @@ class PyExporter:
             var_name = f"l{i}"
             location_var_names.append(var_name)
             # Check if this is the initial location
-            is_initial = (loc.location_id == init_location_id)
+            is_initial = loc.location_id == init_location_id
             loc_code = PyExporter._generate_location_py_code(loc, var_name, is_initial)
             lines.append(loc_code)
             lines.append("")
@@ -315,7 +326,9 @@ class PyExporter:
             for i, edge in enumerate(template.edges):
                 var_name = f"e{i}"
                 edge_var_names.append(var_name)
-                edge_code = PyExporter._generate_edge_py_code(edge, var_name, loc_id_to_pos)
+                edge_code = PyExporter._generate_edge_py_code(
+                    edge, var_name, loc_id_to_pos
+                )
                 lines.append(edge_code)
                 lines.append("")
 
@@ -351,7 +364,9 @@ class PyExporter:
         return "\n".join(lines)
 
     @staticmethod
-    def _generate_location_py_code(location: "Location", var_name: str, is_initial: bool = False) -> str:
+    def _generate_location_py_code(
+        location: "Location", var_name: str, is_initial: bool = False
+    ) -> str:
         """Generate Python code string for a single Location.
 
         Args:
@@ -364,7 +379,9 @@ class PyExporter:
         """
         lines = [f"{var_name} = Location("]
         lines.append(f"    location_id={location.location_id},")
-        lines.append(f"    location_pos={PyExporter._format_tuple(location.location_pos)},")
+        lines.append(
+            f"    location_pos={PyExporter._format_tuple(location.location_pos)},"
+        )
 
         if location.name is not None:
             lines.append(f'    name="{PyExporter._escape_string(location.name)}",')
@@ -373,16 +390,22 @@ class PyExporter:
             lines.append(f"    name_pos={PyExporter._format_tuple(location.name_pos)},")
 
         if location.invariant is not None:
-            lines.append(f'    invariant="{PyExporter._escape_string(location.invariant)}",')
+            lines.append(
+                f'    invariant="{PyExporter._escape_string(location.invariant)}",'
+            )
 
         if location.invariant_pos is not None:
-            lines.append(f"    invariant_pos={PyExporter._format_tuple(location.invariant_pos)},")
+            lines.append(
+                f"    invariant_pos={PyExporter._format_tuple(location.invariant_pos)},"
+            )
 
         if location.rate_of_exponential is not None:
             lines.append(f"    rate_of_exponential={location.rate_of_exponential},")
 
         if location.rate_of_exp_pos is not None:
-            lines.append(f"    rate_of_exp_pos={PyExporter._format_tuple(location.rate_of_exp_pos)},")
+            lines.append(
+                f"    rate_of_exp_pos={PyExporter._format_tuple(location.rate_of_exp_pos)},"
+            )
 
         # Use the passed is_initial parameter (based on init_ref) instead of location.is_initial
         if is_initial:
@@ -402,7 +425,9 @@ class PyExporter:
             lines.append(f'    comments="{escaped}",')
 
         if location.comments_pos is not None:
-            lines.append(f"    comments_pos={PyExporter._format_tuple(location.comments_pos)},")
+            lines.append(
+                f"    comments_pos={PyExporter._format_tuple(location.comments_pos)},"
+            )
 
         if location.test_code_on_enter is not None:
             escaped = PyExporter._escape_string(location.test_code_on_enter)
@@ -417,7 +442,9 @@ class PyExporter:
         return "\n".join(lines)
 
     @staticmethod
-    def _generate_edge_py_code(edge: "Edge", var_name: str, loc_id_to_pos: Dict[int, Tuple[int, int]]) -> str:
+    def _generate_edge_py_code(
+        edge: "Edge", var_name: str, loc_id_to_pos: Dict[int, Tuple[int, int]]
+    ) -> str:
         """Generate Python code string for a single Edge.
 
         Args:
@@ -429,8 +456,12 @@ class PyExporter:
             Python code string.
         """
         # Normalize source/target positions to location positions (always use location pos)
-        source_pos = loc_id_to_pos.get(edge.source_location_id, edge.source_location_pos)
-        target_pos = loc_id_to_pos.get(edge.target_location_id, edge.target_location_pos)
+        source_pos = loc_id_to_pos.get(
+            edge.source_location_id, edge.source_location_pos
+        )
+        target_pos = loc_id_to_pos.get(
+            edge.target_location_id, edge.target_location_pos
+        )
 
         lines = [f"{var_name} = Edge("]
         lines.append(f"    source_location_id={edge.source_location_id},")
@@ -466,21 +497,27 @@ class PyExporter:
             lines.append(f"    probability_weight={edge.probability_weight},")
 
         if edge.prob_weight_pos is not None:
-            lines.append(f"    prob_weight_pos={PyExporter._format_tuple(edge.prob_weight_pos)},")
+            lines.append(
+                f"    prob_weight_pos={PyExporter._format_tuple(edge.prob_weight_pos)},"
+            )
 
         if edge.comments is not None:
             escaped = PyExporter._escape_string(edge.comments)
             lines.append(f'    comments="{escaped}",')
 
         if edge.comments_pos is not None:
-            lines.append(f"    comments_pos={PyExporter._format_tuple(edge.comments_pos)},")
+            lines.append(
+                f"    comments_pos={PyExporter._format_tuple(edge.comments_pos)},"
+            )
 
         if edge.test_code is not None:
             escaped = PyExporter._escape_string(edge.test_code)
             lines.append(f'    test_code="{escaped}",')
 
         if edge.nails:
-            nails_str = "[" + ", ".join(PyExporter._format_tuple(n) for n in edge.nails) + "]"
+            nails_str = (
+                "[" + ", ".join(PyExporter._format_tuple(n) for n in edge.nails) + "]"
+            )
             lines.append(f"    nails={nails_str},")
 
         lines.append(")")
@@ -525,32 +562,40 @@ class PyExporter:
         lines.append("")
 
         # Helper functions
-        lines.extend([
-            "",
-            "# " + "-" * 60,
-            "# Helper load functions",
-            "# " + "-" * 60,
-            "",
-            "def load_global_declaration() -> str:",
-            '    """Load global declaration."""',
-            '    path = os.path.join(_CURRENT_DIR, "decl", "decl.txt")',
-            '    with open(path, "r", encoding="utf-8") as f:',
-            "        return f.read()",
-            "",
-            "",
-            "def load_system_declaration() -> str:",
-            '    """Load system declaration."""',
-            '    path = os.path.join(_CURRENT_DIR, "sys_decl", "sys_decl.txt")',
-            '    with open(path, "r", encoding="utf-8") as f:',
-            "        return f.read()",
-            "",
-            "",
-            "def load_queries() -> list:",
-            '    """Load query list."""',
-            "    from .queries.queries import QUERIES",
-            "    return QUERIES",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "# " + "-" * 60,
+                "# Helper load functions",
+                "# " + "-" * 60,
+                "",
+                "def load_global_declaration() -> str:",
+                '    """Load global declaration."""',
+                '    path = os.path.join(_CURRENT_DIR, "decl", "decl.txt")',
+                '    with open(path, "r", encoding="utf-8") as f:',
+                "        return f.read()",
+                "",
+                "",
+                "def load_system_declaration() -> str:",
+                '    """Load system declaration."""',
+                '    path = os.path.join(_CURRENT_DIR, "sys_decl", "sys_decl.txt")',
+                '    with open(path, "r", encoding="utf-8") as f:',
+                "        return f.read()",
+                "",
+                "",
+                "def load_queries() -> list:",
+                '    """Load query list."""',
+                "    from .queries.queries import QUERIES",
+                "    return QUERIES",
+                "",
+                "",
+                "def load_query_comments() -> list:",
+                '    """Load query comments list."""',
+                "    from .queries.queries import QUERY_COMMENTS",
+                "    return QUERY_COMMENTS",
+                "",
+            ]
+        )
 
         registry_path = os.path.join(output_dir, "registry.py")
         with open(registry_path, "w", encoding="utf-8") as f:
@@ -569,11 +614,11 @@ class PyExporter:
         if s is None:
             return ""
         # Escape backslash first, then other special characters
-        s = s.replace('\\', '\\\\')
+        s = s.replace("\\", "\\\\")
         s = s.replace('"', '\\"')
-        s = s.replace('\n', '\\n')
-        s = s.replace('\r', '\\r')
-        s = s.replace('\t', '\\t')
+        s = s.replace("\n", "\\n")
+        s = s.replace("\r", "\\r")
+        s = s.replace("\t", "\\t")
         return s
 
     @staticmethod
@@ -624,15 +669,15 @@ class PyExporter:
             return "unnamed"
 
         # Replace special characters with underscore
-        safe = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+        safe = re.sub(r"[^a-zA-Z0-9_]", "_", name)
 
         # If starts with number, prefix with underscore
         if safe[0].isdigit():
-            safe = '_' + safe
+            safe = "_" + safe
 
         # If it's a Python keyword, prefix with underscore
         if keyword.iskeyword(safe):
-            safe = safe + '_'
+            safe = safe + "_"
 
         return safe
 
@@ -702,7 +747,9 @@ class PyExporter:
         PyExporter._export_sys_decl_json(umodel.system, output_dir)
 
         # Export queries.json
-        PyExporter._export_queries_json(umodel.queries, output_dir)
+        PyExporter._export_queries_json(
+            umodel.queries, output_dir, umodel.query_comments
+        )
 
         # Export each template to its own subdirectory
         for template in umodel.templates:
@@ -718,20 +765,20 @@ class PyExporter:
         """
         lines = [
             'format = "pyuppaal-pyfmt"',
-            'format_version = 2',
-            '',
-            '[paths]',
+            "format_version = 2",
+            "",
+            "[paths]",
             'decl = "decl/decl.json"',
             'sys_decl = "sys_decl/sys_decl.json"',
             'queries = "queries/queries.json"',
-            '',
+            "",
         ]
 
         for template in umodel.templates:
-            lines.append('[[templates]]')
+            lines.append("[[templates]]")
             lines.append(f'name = "{template.name}"')
             lines.append(f'path = "{template.name}/{template.name}.json"')
-            lines.append('')
+            lines.append("")
 
         manifest_path = os.path.join(output_dir, "manifest.toml")
         with open(manifest_path, "w", encoding="utf-8") as f:
@@ -752,9 +799,7 @@ class PyExporter:
         content = declaration if declaration else ""
         escaped = PyExporter._escape_toml_multiline_string(content)
 
-        lines = [
-            f"declaration = '''{escaped}'''"
-        ]
+        lines = [f"declaration = '''{escaped}'''"]
 
         decl_path = os.path.join(decl_dir, "decl.toml")
         with open(decl_path, "w", encoding="utf-8") as f:
@@ -775,9 +820,7 @@ class PyExporter:
         content = system if system else ""
         escaped = PyExporter._escape_toml_multiline_string(content)
 
-        lines = [
-            f"system = '''{escaped}'''"
-        ]
+        lines = [f"system = '''{escaped}'''"]
 
         sys_decl_path = os.path.join(sys_decl_dir, "sys_decl.toml")
         with open(sys_decl_path, "w", encoding="utf-8") as f:
@@ -818,7 +861,9 @@ class PyExporter:
 
         decl_path = os.path.join(decl_dir, "decl.json")
         with open(decl_path, "w", encoding="utf-8") as f:
-            json.dump({"declaration": declaration or ""}, f, ensure_ascii=False, indent=2)
+            json.dump(
+                {"declaration": declaration or ""}, f, ensure_ascii=False, indent=2
+            )
             f.write("\n")
 
     @staticmethod
@@ -833,15 +878,41 @@ class PyExporter:
             f.write("\n")
 
     @staticmethod
-    def _export_queries_json(queries: List[str], output_dir: str) -> None:
+    def _export_queries_json(
+        queries: List[str],
+        output_dir: str,
+        query_comments: List[str] | None = None,
+    ) -> None:
         """Generate queries/queries.json for machine mode."""
         queries_dir = os.path.join(output_dir, "queries")
         os.makedirs(queries_dir, exist_ok=True)
 
+        data: dict = {"queries": queries or []}
+        comments = PyExporter._normalize_query_comments(queries, query_comments)
+        data["query_comments"] = comments
+
         queries_path = os.path.join(queries_dir, "queries.json")
         with open(queries_path, "w", encoding="utf-8") as f:
-            json.dump({"queries": queries or []}, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
             f.write("\n")
+
+    @staticmethod
+    def _normalize_query_comments(
+        queries: List[str], query_comments: List[str] | None
+    ) -> List[str]:
+        """Normalize query comments to match the number of queries."""
+        if query_comments is None:
+            return [""] * len(queries)
+
+        normalized = [
+            "" if comment is None else str(comment) for comment in query_comments
+        ]
+        query_count = len(queries)
+        if len(normalized) < query_count:
+            normalized.extend([""] * (query_count - len(normalized)))
+        elif len(normalized) > query_count:
+            normalized = normalized[:query_count]
+        return normalized
 
     @staticmethod
     def _export_template_json(template: "Template", output_dir: str) -> None:
@@ -850,7 +921,9 @@ class PyExporter:
         template_dir = os.path.join(output_dir, name)
         os.makedirs(template_dir, exist_ok=True)
 
-        loc_id_to_pos = {loc.location_id: loc.location_pos for loc in template.locations}
+        loc_id_to_pos = {
+            loc.location_id: loc.location_pos for loc in template.locations
+        }
 
         data: dict = {
             "name": name,
@@ -878,7 +951,10 @@ class PyExporter:
             if loc.rate_of_exponential is not None:
                 loc_obj["rate_of_exponential"] = loc.rate_of_exponential
             if loc.rate_of_exp_pos is not None:
-                loc_obj["rate_of_exp_pos"] = [loc.rate_of_exp_pos[0], loc.rate_of_exp_pos[1]]
+                loc_obj["rate_of_exp_pos"] = [
+                    loc.rate_of_exp_pos[0],
+                    loc.rate_of_exp_pos[1],
+                ]
 
             if loc.location_id == template.init_ref:
                 loc_obj["is_initial"] = True
@@ -901,9 +977,13 @@ class PyExporter:
             locations.append(loc_obj)
 
         edges = []
-        for edge in template.edges:
-            source_pos = loc_id_to_pos.get(edge.source_location_id, edge.source_location_pos)
-            target_pos = loc_id_to_pos.get(edge.target_location_id, edge.target_location_pos)
+        for edge in template.edges or []:
+            source_pos = loc_id_to_pos.get(
+                edge.source_location_id, edge.source_location_pos
+            )
+            target_pos = loc_id_to_pos.get(
+                edge.target_location_id, edge.target_location_pos
+            )
 
             edge_obj = {
                 "source_id": edge.source_location_id,
@@ -931,7 +1011,10 @@ class PyExporter:
             if edge.probability_weight is not None:
                 edge_obj["probability_weight"] = edge.probability_weight
             if edge.prob_weight_pos is not None:
-                edge_obj["prob_weight_pos"] = [edge.prob_weight_pos[0], edge.prob_weight_pos[1]]
+                edge_obj["prob_weight_pos"] = [
+                    edge.prob_weight_pos[0],
+                    edge.prob_weight_pos[1],
+                ]
             if edge.comments is not None:
                 edge_obj["comments"] = edge.comments
             if edge.comments_pos is not None:
@@ -972,7 +1055,7 @@ class PyExporter:
 
         lines = [
             f'name = "{name}"',
-            f'init_ref = {template.init_ref}',
+            f"init_ref = {template.init_ref}",
         ]
 
         # Add params if present
@@ -980,30 +1063,30 @@ class PyExporter:
             escaped_params = PyExporter._escape_toml_basic_string(template.params)
             lines.append(f'params = "{escaped_params}"')
 
-        lines.append('')
+        lines.append("")
 
         # Add local declaration
         local_decl = template.declaration if template.declaration else ""
         escaped_decl = PyExporter._escape_toml_multiline_string(local_decl)
         lines.append(f"local_decl = '''{escaped_decl}'''")
-        lines.append('')
+        lines.append("")
 
         # Add locations
-        lines.append('locations = [')
+        lines.append("locations = [")
         for loc in template.locations:
             loc_line = PyExporter._format_location_toml(loc, template.init_ref)
-            lines.append(f'  {loc_line},')
-        lines.append(']')
-        lines.append('')
+            lines.append(f"  {loc_line},")
+        lines.append("]")
+        lines.append("")
 
         # Add edges
-        lines.append('edges = [')
+        lines.append("edges = [")
         if template.edges:
             for edge in template.edges:
                 edge_lines = PyExporter._format_edge_toml(edge, loc_id_to_pos)
                 for el in edge_lines:
                     lines.append(el)
-        lines.append(']')
+        lines.append("]")
 
         template_path = os.path.join(template_dir, f"{name}.toml")
         with open(template_path, "w", encoding="utf-8") as f:
@@ -1021,8 +1104,8 @@ class PyExporter:
             TOML inline table string.
         """
         parts = [
-            f'id = {location.location_id}',
-            f'pos = [{location.location_pos[0]}, {location.location_pos[1]}]',
+            f"id = {location.location_id}",
+            f"pos = [{location.location_pos[0]}, {location.location_pos[1]}]",
         ]
 
         if location.name is not None:
@@ -1030,40 +1113,46 @@ class PyExporter:
             parts.append(f'name = "{escaped}"')
 
         if location.name_pos is not None:
-            parts.append(f'name_pos = [{location.name_pos[0]}, {location.name_pos[1]}]')
+            parts.append(f"name_pos = [{location.name_pos[0]}, {location.name_pos[1]}]")
 
         if location.invariant is not None:
             escaped = PyExporter._escape_toml_basic_string(location.invariant)
             parts.append(f'invariant = "{escaped}"')
 
         if location.invariant_pos is not None:
-            parts.append(f'invariant_pos = [{location.invariant_pos[0]}, {location.invariant_pos[1]}]')
+            parts.append(
+                f"invariant_pos = [{location.invariant_pos[0]}, {location.invariant_pos[1]}]"
+            )
 
         if location.rate_of_exponential is not None:
-            parts.append(f'rate_of_exponential = {location.rate_of_exponential}')
+            parts.append(f"rate_of_exponential = {location.rate_of_exponential}")
 
         if location.rate_of_exp_pos is not None:
-            parts.append(f'rate_of_exp_pos = [{location.rate_of_exp_pos[0]}, {location.rate_of_exp_pos[1]}]')
+            parts.append(
+                f"rate_of_exp_pos = [{location.rate_of_exp_pos[0]}, {location.rate_of_exp_pos[1]}]"
+            )
 
         # Use init_ref to determine if this is initial
         if location.location_id == init_ref:
-            parts.append('is_initial = true')
+            parts.append("is_initial = true")
 
         if location.is_urgent:
-            parts.append('urgent = true')
+            parts.append("urgent = true")
 
         if location.is_committed:
-            parts.append('committed = true')
+            parts.append("committed = true")
 
         if location.is_branchpoint:
-            parts.append('branchpoint = true')
+            parts.append("branchpoint = true")
 
         if location.comments is not None:
             escaped = PyExporter._escape_toml_basic_string(location.comments)
             parts.append(f'comments = "{escaped}"')
 
         if location.comments_pos is not None:
-            parts.append(f'comments_pos = [{location.comments_pos[0]}, {location.comments_pos[1]}]')
+            parts.append(
+                f"comments_pos = [{location.comments_pos[0]}, {location.comments_pos[1]}]"
+            )
 
         if location.test_code_on_enter is not None:
             escaped = PyExporter._escape_toml_basic_string(location.test_code_on_enter)
@@ -1073,10 +1162,12 @@ class PyExporter:
             escaped = PyExporter._escape_toml_basic_string(location.test_code_on_exit)
             parts.append(f'test_code_on_exit = "{escaped}"')
 
-        return '{ ' + ', '.join(parts) + ' }'
+        return "{ " + ", ".join(parts) + " }"
 
     @staticmethod
-    def _format_edge_toml(edge: "Edge", loc_id_to_pos: Dict[int, Tuple[int, int]]) -> List[str]:
+    def _format_edge_toml(
+        edge: "Edge", loc_id_to_pos: Dict[int, Tuple[int, int]]
+    ) -> List[str]:
         """Format an Edge as TOML table.
 
         Args:
@@ -1087,65 +1178,77 @@ class PyExporter:
             List of TOML lines for the edge.
         """
         # Normalize source/target positions to location positions
-        source_pos = loc_id_to_pos.get(edge.source_location_id, edge.source_location_pos)
-        target_pos = loc_id_to_pos.get(edge.target_location_id, edge.target_location_pos)
+        source_pos = loc_id_to_pos.get(
+            edge.source_location_id, edge.source_location_pos
+        )
+        target_pos = loc_id_to_pos.get(
+            edge.target_location_id, edge.target_location_pos
+        )
 
-        lines = ['  {']
-        lines.append(f'    source_id = {edge.source_location_id},')
-        lines.append(f'    target_id = {edge.target_location_id},')
-        lines.append(f'    source_pos = [{source_pos[0]}, {source_pos[1]}],')
-        lines.append(f'    target_pos = [{target_pos[0]}, {target_pos[1]}],')
+        lines = ["  {"]
+        lines.append(f"    source_id = {edge.source_location_id},")
+        lines.append(f"    target_id = {edge.target_location_id},")
+        lines.append(f"    source_pos = [{source_pos[0]}, {source_pos[1]}],")
+        lines.append(f"    target_pos = [{target_pos[0]}, {target_pos[1]}],")
 
         if edge.select is not None:
             escaped = PyExporter._escape_toml_basic_string(edge.select)
             lines.append(f'    select = "{escaped}",')
 
         if edge.select_pos is not None:
-            lines.append(f'    select_pos = [{edge.select_pos[0]}, {edge.select_pos[1]}],')
+            lines.append(
+                f"    select_pos = [{edge.select_pos[0]}, {edge.select_pos[1]}],"
+            )
 
         if edge.sync is not None:
             escaped = PyExporter._escape_toml_basic_string(edge.sync)
             lines.append(f'    sync = "{escaped}",')
 
         if edge.sync_pos is not None:
-            lines.append(f'    sync_pos = [{edge.sync_pos[0]}, {edge.sync_pos[1]}],')
+            lines.append(f"    sync_pos = [{edge.sync_pos[0]}, {edge.sync_pos[1]}],")
 
         if edge.update is not None:
             escaped = PyExporter._escape_toml_basic_string(edge.update)
             lines.append(f'    update = "{escaped}",')
 
         if edge.update_pos is not None:
-            lines.append(f'    update_pos = [{edge.update_pos[0]}, {edge.update_pos[1]}],')
+            lines.append(
+                f"    update_pos = [{edge.update_pos[0]}, {edge.update_pos[1]}],"
+            )
 
         if edge.guard is not None:
             escaped = PyExporter._escape_toml_basic_string(edge.guard)
             lines.append(f'    guard = "{escaped}",')
 
         if edge.guard_pos is not None:
-            lines.append(f'    guard_pos = [{edge.guard_pos[0]}, {edge.guard_pos[1]}],')
+            lines.append(f"    guard_pos = [{edge.guard_pos[0]}, {edge.guard_pos[1]}],")
 
         if edge.probability_weight is not None:
-            lines.append(f'    probability_weight = {edge.probability_weight},')
+            lines.append(f"    probability_weight = {edge.probability_weight},")
 
         if edge.prob_weight_pos is not None:
-            lines.append(f'    prob_weight_pos = [{edge.prob_weight_pos[0]}, {edge.prob_weight_pos[1]}],')
+            lines.append(
+                f"    prob_weight_pos = [{edge.prob_weight_pos[0]}, {edge.prob_weight_pos[1]}],"
+            )
 
         if edge.comments is not None:
             escaped = PyExporter._escape_toml_basic_string(edge.comments)
             lines.append(f'    comments = "{escaped}",')
 
         if edge.comments_pos is not None:
-            lines.append(f'    comments_pos = [{edge.comments_pos[0]}, {edge.comments_pos[1]}],')
+            lines.append(
+                f"    comments_pos = [{edge.comments_pos[0]}, {edge.comments_pos[1]}],"
+            )
 
         if edge.test_code is not None:
             escaped = PyExporter._escape_toml_basic_string(edge.test_code)
             lines.append(f'    test_code = "{escaped}",')
 
         if edge.nails:
-            nails_str = ', '.join(f'[{n[0]}, {n[1]}]' for n in edge.nails)
-            lines.append(f'    nails = [{nails_str}],')
+            nails_str = ", ".join(f"[{n[0]}, {n[1]}]" for n in edge.nails)
+            lines.append(f"    nails = [{nails_str}],")
 
-        lines.append('  },')
+        lines.append("  },")
         return lines
 
     @staticmethod
@@ -1161,11 +1264,11 @@ class PyExporter:
         if s is None:
             return ""
         # Escape backslash first, then other special characters
-        s = s.replace('\\', '\\\\')
+        s = s.replace("\\", "\\\\")
         s = s.replace('"', '\\"')
-        s = s.replace('\n', '\\n')
-        s = s.replace('\r', '\\r')
-        s = s.replace('\t', '\\t')
+        s = s.replace("\n", "\\n")
+        s = s.replace("\r", "\\r")
+        s = s.replace("\t", "\\t")
         return s
 
     @staticmethod
